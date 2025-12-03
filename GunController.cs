@@ -5,7 +5,6 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
 
 public class GunController : MonoBehaviour
 {
@@ -27,12 +26,11 @@ public class GunController : MonoBehaviour
     //Lists
     [SerializeField] List<GameObject> positions;
     [SerializeField] List<GameObject> hudTrackers;
-    //Filters out what we aim and checks for this layer.
-    //if i knew i would need these many variables just for some cosmetic effects, i never would have started (this includes the FireRate variable)
+    
     [SerializeField] GameObject lockHud;
     [SerializeField] GameObject decoyHud;
     [SerializeField] Transform spawn;
-    //This is just so we can physically point the gun. The player can't see it but I already programmed it in and it took some effort getting it pointed right
+    //This is just so we can physically point the gun.
     [SerializeField] Transform gun;
     [SerializeField] GameObject gunBase;
 
@@ -57,10 +55,10 @@ public class GunController : MonoBehaviour
     [SerializeField] ParticleSystem LaserParticle; //Optional.
     public bool isMining = false; //So we can check the current status of the laser
     public bool canMine = false; //Some general criteria thing
-    public bool safeAngle = true;
-    public bool Cool = false; //Cooldown boolean
+    public bool safeAngle = true; //The player cant fire the laser at themselves unfortunately.
+    public bool Cool = false; //Cooldown boolean (deprecated)
     public bool chargingLaser = false;
-    public float laserTimer = 0f; //Once we're done with the laser, keep track of how long we've been not using it
+    public float laserTimer = 0f; //Once we're done with the laser, keep track of how long we've been not using it (For a cooldown. This is deprecated.)
     public float laserOnTimer = 0f; // How long the laser has been on
 
     private float timer = 0f;
@@ -81,7 +79,7 @@ public class GunController : MonoBehaviour
     [SerializeField] GameObject PopUp;
     [SerializeField] TextMeshProUGUI PopUpText;
     [SerializeField] TextMeshPro oreCollectedText;
-
+    //Tutorial stuff
     [SerializeField] StoryManager storyManager;
     bool playedTutLine1 = false;
     bool playedTutLine2 = false;
@@ -602,3 +600,4 @@ public class GunController : MonoBehaviour
         }
     }
 }
+
