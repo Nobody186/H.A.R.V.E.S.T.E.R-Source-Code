@@ -83,7 +83,6 @@ public class EnemyMovement : MonoBehaviour
 
     public Vector3 Target;
     public Vector3 secondaryTarget; //A reminder of the main objective during obstacle avoidance.
-    public Vector3 temporaryTarget; //1: We only use this to handle the avoidance logic, and make sure we dont look for a new route every frame. Ctrl + F for more details.
     
     Vector3 vectorToTarget;
     Quaternion directionToTarget;
@@ -142,7 +141,6 @@ public class EnemyMovement : MonoBehaviour
 
         Target = Vector3.zero;
         secondaryTarget = Vector3.zero;
-        temporaryTarget = Vector3.zero;
 
         closestAsteroid = null;
         prevAsteroid = null;
@@ -373,7 +371,6 @@ public class EnemyMovement : MonoBehaviour
                 secondaryTarget = Vector3.zero;
                 avoiding = false;
                 BestRoute = Vector3.zero;
-                temporaryTarget = Vector3.zero; //4: Rest our temporary target for future use.
             }
         }
     }
@@ -758,7 +755,6 @@ public class EnemyMovement : MonoBehaviour
             }
         }
         Target = (BestRoute.normalized * 50f) + transform.position;
-        temporaryTarget = Target; //2: We need something to compare Target to for reference. Look below
         pathfinding = false;
     }
 
