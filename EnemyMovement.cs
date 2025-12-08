@@ -81,8 +81,9 @@ public class EnemyMovement : MonoBehaviour
     public Vector3 BestRoute;
     Vector3 direction;
 
-    Vector3 Target;
-    Vector3 secondaryTarget; //A reminder of the main objective during obstacle avoidance.
+    public Vector3 Target;
+    public Vector3 secondaryTarget; //A reminder of the main objective during obstacle avoidance.
+    public Vector3 temporaryTarget; //1: We only use this to handle the avoidance logic, and make sure we dont look for a new route every frame. Ctrl + F for more details.
     
     Vector3 vectorToTarget;
     Quaternion directionToTarget;
@@ -114,6 +115,8 @@ public class EnemyMovement : MonoBehaviour
     private const float asteroidScanInterval = 1f; //Scan for asteroids once per second
     private float stateCheckTimer = 0f;
     private const float stateCheckInterval = 0.2f; //The interval in which we check the bot's current state
+    private const float avoidanceCheckInterval = 0.7f; //Look for obstacles every 0.7 seconds.
+    private float avoidanceCheckTimer = 0f;
 
     //Cached references
     private Camera mainCamera;
@@ -139,6 +142,7 @@ public class EnemyMovement : MonoBehaviour
 
         Target = Vector3.zero;
         secondaryTarget = Vector3.zero;
+        temporaryTarget = Vector3.zero;
 
         closestAsteroid = null;
         prevAsteroid = null;
@@ -190,15 +194,21 @@ public class EnemyMovement : MonoBehaviour
         //Core movement logic. All it says is to move towards the target, and play your particle/sound effects.
         HandleMovement();
 
-        //Obstacle avoidance.
-        HandleObstacleAvoidance();
-
         //State management (less frequent)
         stateCheckTimer += updateInterval;
         if (stateCheckTimer >= stateCheckInterval)
         {
             stateCheckTimer = 0f;
             UpdateAIState();
+        }
+
+        //Avoidance management (least frequent). The logic here is that if there is an obstacle, we have some time to point in a new direction before we try to generate a new path.
+        avoidanceCheckTimer += updateInterval;
+        if(avoidanceCheckTimer >= avoidanceCheckInterval)
+        {
+            //We shoot a raycast to make sure we aren't doing anything stupid. This sets the avoiding bool.
+            HandleObstacleAvoidance();
+            avoidanceCheckTimer = 0f;
         }
 
         //Behavior execution
@@ -261,21 +271,14 @@ public class EnemyMovement : MonoBehaviour
         }
     }
 
-    private void HandleMovement()
+    private void HandleMovement() //Note: We are always moving towards the target. The secondary target is not a place to move to, it's used for comparisons.
     {
         //Get us some numbers we need to move the ship.
         if (Target != Vector3.zero)
         {
-            if (avoiding)
-            {
-                distance = (transform.position - secondaryTarget).magnitude;
-            }
-            else
-            {
-                distance = (transform.position - Target).magnitude;
-            }
+            distance = (transform.position - Target).magnitude;
 
-            vectorToTarget = (Target - transform.position).normalized;
+            vectorToTarget = (Target - transform.position).normalized; //We use this stuff to know where to go.
             directionToTarget = Quaternion.LookRotation(vectorToTarget, Vector3.up);
 
             if (isDrone && !firingThrusters && !gameObject.name.Contains("Mining"))
@@ -284,28 +287,18 @@ public class EnemyMovement : MonoBehaviour
             }
         }
 
-        //Handle our particle effects, and change our damping if we're too off course.
-        if (distance > stopDistance && chase)
+        //We move.
+        if (distance > stopDistance)
         {
             rb.linearDamping = 1f - (Mathf.Clamp01(Vector3.Dot(transform.forward, vectorToTarget))) * 5f; //This should keep our linear damping at 1 when we're on target, and make it higher when we're not (so we can slow down and adjust)
-            rb.AddRelativeForce(0f, 0f, chasePosSpeed * updateInterval);
-
-            if (isVisible && isDrone && !mainThruster.isPlaying)
+            if (chase)
             {
-                mainThruster.Play();
+                rb.AddRelativeForce(0f, 0f, chasePosSpeed * updateInterval);
             }
-            else if (isVisible && isDisc && !mainThrusters[2].isPlaying && !sneaking)
+            else
             {
-                for (int i = 0; i < mainThrusters.Count; i++)
-                {
-                    mainThrusters[i].Play();
-                }
+                rb.AddRelativeForce(0f, 0f, posSpeed * updateInterval);
             }
-        }
-        else if (distance > stopDistance && !chase)
-        {
-            rb.linearDamping = 1f - (Mathf.Clamp01(Vector3.Dot(transform.forward, vectorToTarget))) * 5f;
-            rb.AddRelativeForce(0f, 0f, posSpeed * updateInterval);
 
             if (isVisible && isDrone && !mainThruster.isPlaying)
             {
@@ -327,6 +320,10 @@ public class EnemyMovement : MonoBehaviour
         }
 
         //Rotation
+        if(avoiding)
+        {
+            transform.localRotation = Quaternion.Slerp(transform.localRotation, directionToTarget, updateInterval * chaseRotSpeed*2f); //If we have an obstacle, we gotta SWERVE!
+        }
         if (chase)
         {
             transform.localRotation = Quaternion.Slerp(transform.localRotation, directionToTarget, updateInterval * chaseRotSpeed);
@@ -352,20 +349,32 @@ public class EnemyMovement : MonoBehaviour
         RaycastHit hit;
         if (Physics.Raycast(pathfinder.position, pathfinder.forward, out hit, avoidRange)) //If there's something in front of us and it's not the player, get out of the way.
         {
-            if (hit.transform.name != "PlayerShip" && hit.transform.position != Target)
+            if (hit.transform.name != "PlayerShip" && hit.transform.position != Target && !hit.transform.gameObject.GetComponent<Collider>().isTrigger)
             {
+                print(gameObject.name + " HAS DETECTED A " + hit.transform.name + "! AVOIDANCE SYSTEM ACTIVATED!");
                 avoiding = true;
-                AvoidObstacle();
+
+                if (Vector3.Distance(secondaryTarget, Vector3.zero) < 1f) //If haven't cached our current target yet, do so.
+                {
+                    print("SETTING SECONDARY TARGET TO TARGET!");
+                    secondaryTarget = Target; //First thing we do is store the target we originally wanted to go to.
+                }
+                print(gameObject.name + " IS FETCHING AN AVOIDANCE ROUTE!");
+                findAvoidanceRoute();
             }
         }
         else
         {
+            print(gameObject.name + " REPORTS: MY VIEW IS CLEAR!");
             if (secondaryTarget != Vector3.zero) //If there's nothing ahead of us, but we're still avoiding (secondaryTarget is always Vector3.zero if not avoiding), then get back on task and turn off the avoiding state.
             {
+                print(gameObject.name + " HAS EXITED ITS AVOIDANCE MODE!");
                 Target = secondaryTarget;
                 secondaryTarget = Vector3.zero;
+                avoiding = false;
+                BestRoute = Vector3.zero;
+                temporaryTarget = Vector3.zero; //4: Rest our temporary target for future use.
             }
-            avoiding = false;
         }
     }
 
@@ -659,7 +668,7 @@ public class EnemyMovement : MonoBehaviour
         }
     }
 
-    private void ScanForAsteroidsOptimized()
+    private void ScanForAsteroidsOptimized() //This is for the mining bots to know about their surroundings.
     {
         laserEmission.Stop();
 
@@ -709,7 +718,7 @@ public class EnemyMovement : MonoBehaviour
         }
     }
 
-    void findAvoidanceRoute()
+    void findAvoidanceRoute() //This is only for pathfinding purposes. This will give us a temporary target that moves us away from danger.
     {
         pathfinding = true;
         if (possibleRoutes != null)
@@ -719,20 +728,19 @@ public class EnemyMovement : MonoBehaviour
         }
         BestRoute = Vector3.zero;
 
-        pathfinder.localRotation = pathfinder.localRotation;
         //Generate a bunch of possible directions to go
         for (int i = 0; i < 100; i++)
         {
             direction = Random.onUnitSphere;
-            if (Vector3.Dot(gameObject.transform.forward, direction) < 0f) //Make sure we keep moving forward (in a 180 degree cone).
-            {
-                direction = -direction;
-            }
+            //if (Vector3.Dot(gameObject.transform.forward, direction) < 0f) //Make sure we keep moving forward (in a 180 degree cone).
+            //{
+                //direction = -direction;
+            //}
             RaycastHit hit;
-            bool theHit = Physics.Raycast(pathfinder.position, direction, out hit, 50f);
+            bool theHit = Physics.Raycast(pathfinder.position, direction, out hit, avoidRange+20f); //Shoot our raycasts as far as we need, with a little bit of grace.
 
             possibleRoutes.Add(direction);
-            ranges.Add(theHit ? hit.distance : 50f);
+            ranges.Add(theHit ? hit.distance : avoidRange+20f); //We will use these ranges to find the least obstructed path.
 
         }
 
@@ -740,9 +748,9 @@ public class EnemyMovement : MonoBehaviour
 
         for (int i = 0; i < possibleRoutes.Count; i++)
         {
-            float alignment = Vector3.Dot(gameObject.transform.forward, possibleRoutes[i]);
-            float deviation = Vector3.Distance(possibleRoutes[i], secondaryTarget);
-            float score = alignment * ranges[i] * (500 / deviation);
+            float alignment = Vector3.Dot(gameObject.transform.forward, possibleRoutes[i]); //Closer to 1 for routes that are close to where we're already pointing.
+            float deviation = Vector3.Distance(transform.position + possibleRoutes[i]*avoidRange, secondaryTarget); //We want a point that still keeps us focused on where we ACTUALLY want to go.
+            float score = alignment * ranges[i] * (500 / deviation); //This gives better routes a higher score, with emphasis on low obscurity and ease of access.
             if (score > previousScore)
             {
                 BestRoute = possibleRoutes[i];
@@ -750,33 +758,8 @@ public class EnemyMovement : MonoBehaviour
             }
         }
         Target = (BestRoute.normalized * 50f) + transform.position;
+        temporaryTarget = Target; //2: We need something to compare Target to for reference. Look below
         pathfinding = false;
-    }
-
-    void AvoidObstacle()
-    {
-        if (avoiding == true)
-        {
-            secondaryTarget = Target;
-            if (Target != BestRoute.normalized * 50f)
-            {
-                findAvoidanceRoute();
-            }
-            rb.linearDamping = 1f - (Mathf.Clamp01(Vector3.Dot(gameObject.transform.forward, vectorToTarget))) * 5f;
-            if (rb.linearDamping < 0.8f)
-            {
-                rb.linearDamping = 0.8f;
-            }
-            gameObject.transform.localRotation = Quaternion.Slerp(gameObject.transform.localRotation, directionToTarget, Time.deltaTime * chaseRotSpeed);
-
-            if (Vector3.Distance(gameObject.transform.position, Target) <= 5f)
-            {
-                Target = secondaryTarget;
-                secondaryTarget = Vector3.zero;
-                avoiding = false;
-                BestRoute = Vector3.zero;
-            }
-        }
     }
 
     private IEnumerator ATTACK()
@@ -882,7 +865,7 @@ public class EnemyMovement : MonoBehaviour
                 }
             }
 
-            if (closestAsteroid == null)
+            if (closestAsteroid == null) //If there are no asteroids, then just go for the player and exit this function.
             {
                 if (!avoiding)
                 {
@@ -904,11 +887,11 @@ public class EnemyMovement : MonoBehaviour
                 if (sphereAroundPoint.Length < 1)
                 {
                     float distanceToPlayer = Vector3.Distance(idealPoint, Player.position);
-                    if ((prevPoint != Vector3.zero) && (Vector3.Distance(prevPoint, Player.position) < distanceToPlayer))
+                    if ((prevPoint != Vector3.zero) && (Vector3.Distance(prevPoint, Player.position) < distanceToPlayer)) //If our previous point is closer to the player than our new (ideal) point, then set our previous point to the ideal point.
                     {
                         prevPoint = idealPoint;
                     }
-                    else if (prevPoint != Vector3.zero && (Vector3.Distance(prevPoint, Player.position) > distanceToPlayer))
+                    else if (prevPoint != Vector3.zero && (Vector3.Distance(prevPoint, Player.position) > distanceToPlayer)) //Dont really know why we have this here exactly
                     {
                         idealPoint = prevPoint;
                     }
@@ -920,13 +903,13 @@ public class EnemyMovement : MonoBehaviour
             }
             closestAsteroid = null;
             prevAsteroid = null;
-            if (idealPoint != Vector3.zero)
+            if (prevPoint != Vector3.zero)
             {
                 if (!avoiding)
                 {
-                    Target = idealPoint;
+                    Target = prevPoint;
                 }
-                if (avoiding)
+                else if (avoiding)
                 {
                     secondaryTarget = prevPoint;
                 }
