@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -199,7 +199,27 @@ public class monitorManager : MonoBehaviour
         {
             errorPanel.SetActive(false);
         }
-        waypointLabel.text = "'" + console.waypoints[console.currentWaypoint].name + "'";
+        if(console.currentWaypoint == 0)
+        {
+            waypointLabel.text = "\"" + console.waypoints[console.currentWaypoint].name + "\"\n!NO-MINING ZONE!";
+        }
+        else if(console.currentWaypoint == 1)
+        {
+            waypointLabel.text = "\"" + console.waypoints[console.currentWaypoint].name + "\"\nU-TYPE MINING ZONE";
+        }
+        else if(console.currentWaypoint == 2)
+        {
+            waypointLabel.text = "\"" + console.waypoints[console.currentWaypoint].name + "\"\nA/B-TYPE MINING ZONE";
+        }
+        else if( console.currentWaypoint == 3)
+        {
+            waypointLabel.text = "\"" + console.waypoints[console.currentWaypoint].name + "\"\nG-TYPE MINING ZONE";
+        }
+        else
+        {
+            waypointLabel.text = "\"" + console.waypoints[console.currentWaypoint].name + "\"\nC-TYPE MINING ZONE";
+        }
+
         fusionCellCounter.text = "FUSION CELLS LEFT: " + console.fusionCells;
     }
     IEnumerator WarpConfirmation()
@@ -292,12 +312,12 @@ public class monitorManager : MonoBehaviour
         }
     }
 
-    string FormatQuotaLine(string resourceName, float quota, float held, string unit = "K")
+    string FormatQuotaLine(string resourceName, float quota, float held)
     {
-        if (quota <= 0) return ""; // Skip if no quota assigned
+        if (quota <= 0) return ""; //Skip if no quota assigned
 
         bool isMet = held >= quota;
-        string status = isMet ? "✓ " : "• ";
+        string status = isMet ? "✓ " : "X ";
         string color = isMet ? "<color=green>" : "<color=white>";
         string endColor = "</color>";
 
@@ -305,7 +325,7 @@ public class monitorManager : MonoBehaviour
         string quotaDisplay;
         string heldDisplay;
 
-        if (unit == "K")
+        if (quota >= 1000f)
         {
             quotaDisplay = Mathf.Round(quota / 1000f).ToString() + "K";
             heldDisplay = Mathf.Round(held / 1000f).ToString() + "K";
@@ -349,7 +369,7 @@ public class monitorManager : MonoBehaviour
         quotaText.text += FormatQuotaLine("CARBON", console.carbonQuota, console.carbonHeld);
         quotaText.text += FormatQuotaLine("COBALT", console.cobaltQuota, console.cobaltHeld);
         quotaText.text += FormatQuotaLine("NICKEL", console.nickelQuota, console.nickelHeld);
-        quotaText.text += FormatQuotaLine("HELIUM-3", console.helium3Quota, console.helium3Held, "");
+        quotaText.text += FormatQuotaLine("HELIUM-3", console.helium3Quota, console.helium3Held);
 
         // Remove trailing newline
         quotaText.text = quotaText.text.TrimEnd('\n');
