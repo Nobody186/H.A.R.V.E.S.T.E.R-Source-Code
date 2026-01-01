@@ -469,19 +469,7 @@ public class SpaceStationManager : MonoBehaviour
             repairVoicelines[1].Play();
             yield return new WaitForSeconds(repairVoicelines[1].clip.length);
         }
-        console.ironHeld = 0;
-        console.helium3Held = 0;
-        console.aluminumHeld = 0;
-        console.carbonHeld = 0;
-        console.clayHeld = 0;
-        console.cobaltHeld = 0;
-        console.diamondHeld = 0;
-        console.hydrogenHeld = 0;
-        console.iceHeld = 0;
-        console.magnesiumHeld = 0;
-        console.nickelHeld = 0;
-        console.platiniumHeld = 0;
-        console.plutoniumHeld = 0;
+
         console.Balance -= 5000;
         GameObject temp = Instantiate(moneyPopup, canvas);
         temp.SetActive(true);
