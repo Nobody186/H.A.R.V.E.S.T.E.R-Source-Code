@@ -55,6 +55,8 @@ public class Mineable : MonoBehaviour
     [SerializeField] float carbonAmount;
     [SerializeField] float iceAmount;
 
+    int oreType;
+
     public float totalValue;
     float laseredValue;
     private float totalStuffAmount;
@@ -121,26 +123,164 @@ public class Mineable : MonoBehaviour
             meltSpeed = 0.00001f;
         }
 
+        //1 = Metallic. 2 = Soft. 3 = Gas. 4 = Carbonic. 5 = Starter (has all quotas)
+
+        if(gameObject.name.Contains("AType"))
+        {
+            oreType = 0;
+        }
+        else if(gameObject.name.Contains("BType"))
+        {
+            oreType = 1;
+        }
+        else if (gameObject.name.Contains("GType"))
+        {
+            oreType = 2;
+        }
+        else if (gameObject.name.Contains("CType"))
+        {
+            oreType = 3;
+        }
+        else
+        {
+            oreType = 4;
+        }
+
+        int baseSelector = Random.Range(0, 3); //Each ore type has either one kind of base, or both of them.
+
+        switch (oreType)
+        {
+            case 0: //METTALIC
+                if(baseSelector == 0)
+                {
+                    ironAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                }
+                else if(baseSelector == 1)
+                {
+                    aluminumAmount = Random.Range(300f, 520f) * maxHealth / 10;
+                }
+                else
+                {
+                    ironAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                    magnesiumAmount = Random.Range(300f, 520f) * maxHealth / 10;
+                }
+
+                if (Random.value < 0.40f) nickelAmount = Random.Range(40f, 160f) * maxHealth / 10;
+                if (Random.value <= 0.01f) platiniumAmount = Random.Range(0.5f, 3f) * maxHealth / 10;
+
+                break;
+
+            case 1: //SOFT
+                if (baseSelector == 0)
+                {
+                    clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                }
+                else if (baseSelector == 1)
+                {
+                    magnesiumAmount = Random.Range(250f, 400f) * maxHealth / 10;
+                }
+                else
+                {
+                    clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                    magnesiumAmount = Random.Range(250f, 400f) * maxHealth / 10;
+                }
+
+                if (Random.value < 0.35f) cobaltAmount = Random.Range(32f, 150f) * maxHealth / 10; //Yes, I know cobalt isn't soft. But I can't just put all the valuable stuff in the "metallic" ore.
+                if (Random.value <= 0.025f) diamondAmount = Random.Range(0.8f, 7f) * maxHealth / 10;
+
+                break;
+
+            case 2: //GAS
+                isToxic = true;
+                if (baseSelector == 0)
+                {
+                    iceAmount = Random.Range(95f, 400f) * maxHealth / 10;
+                }
+                else if (baseSelector == 1)
+                {
+                    hydrogenAmount = Random.Range(100f, 280f) * maxHealth / 10;
+                }
+                else
+                {
+                    iceAmount = Random.Range(95f, 400f) * maxHealth / 10;
+                    hydrogenAmount = Random.Range(100f, 280f) * maxHealth / 10;
+                }
+
+                if (Random.value < 0.15f) helium3Amount = Random.Range(1f, 5f) * maxHealth / 10;
+                if (Random.value <= 0.005f) plutoniumAmount = Random.Range(0.5f, 2f) * maxHealth / 10;
+
+                break;
+
+            case 3: //CARBONIC
+                if (baseSelector == 0)
+                {
+                    carbonAmount = Random.Range(95f, 200f) * maxHealth / 10;
+                }
+                else if (baseSelector == 1)
+                {
+                    clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                }
+                else
+                {
+                    carbonAmount = Random.Range(95f, 200f) * maxHealth / 10;
+                    clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                }
+
+                if (Random.value < 0.15f) hydrogenAmount = Random.Range(100f, 280f) * maxHealth / 10;
+                if (Random.value < 0.025f) diamondAmount = Random.Range(0.8f, 7f) * maxHealth / 10;
+
+                break;
+
+            case 4: //STARTER
+                if (baseSelector == 0)
+                {
+                    ironAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                }
+                else if (baseSelector == 1)
+                {
+                    clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                }
+                else
+                {
+                    ironAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                    clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                }
+
+                //Additional Stuff that wouldn't hurt.
+                if (Random.value < 0.4f) magnesiumAmount = Random.Range(300f, 520f) * maxHealth / 10;
+                if (Random.value < 0.4f) aluminumAmount = Random.Range(250f, 400f) * maxHealth / 10;
+                if (Random.value < 0.3f) iceAmount = Random.Range(95f, 400f) * maxHealth / 10;
+                if (Random.value < 0.3f) hydrogenAmount = Random.Range(100f, 280f) * maxHealth / 10;
+                if (Random.value < 0.4f) carbonAmount = Random.Range(95f, 200f) * maxHealth / 10;
+
+                // Rarer, mid-Tier stuff
+                if (Random.value < 0.25f) nickelAmount = Random.Range(40f, 160f) * maxHealth / 10;
+                if (Random.value < 0.15f) cobaltAmount = Random.Range(32f, 150f) * maxHealth / 10;
+                if (Random.value < 0.05f) helium3Amount = Random.Range(1f, 5f) * maxHealth / 10;
+
+                break; 
+        }
+
+
+        //DEFAULT LIST OF STUFF FOR REFERENCE.
         //Common stuff
-        if (Random.value < 0.9f) ironAmount = Random.Range(1000f, 1500f) * maxHealth/10;
-        if (Random.value < 0.6f) clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
-        if (Random.value < 0.7f) magnesiumAmount = Random.Range(300f, 520f) * maxHealth / 10;
-        if (Random.value < 0.6f) aluminumAmount = Random.Range(250f, 400f) * maxHealth / 10;
-        if (Random.value < 0.4f) iceAmount = Random.Range(95f, 400f) * maxHealth / 10;
-        if (Random.value < 0.3f) hydrogenAmount = Random.Range(100f, 280f) * maxHealth / 10;
-        if (Random.value < 0.4f) carbonAmount = Random.Range(95f, 200f) * maxHealth / 10;
+        //if (Random.value < 0.9f) ironAmount = Random.Range(1000f, 1500f) * maxHealth/10;
+        //if (Random.value < 0.6f) clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+        //if (Random.value < 0.7f) magnesiumAmount = Random.Range(300f, 520f) * maxHealth / 10;
+        //if (Random.value < 0.6f) aluminumAmount = Random.Range(250f, 400f) * maxHealth / 10;
+        //if (Random.value < 0.4f) iceAmount = Random.Range(95f, 400f) * maxHealth / 10;
+        //if (Random.value < 0.3f) hydrogenAmount = Random.Range(100f, 280f) * maxHealth / 10;
+        //if (Random.value < 0.4f) carbonAmount = Random.Range(95f, 200f) * maxHealth / 10;
 
         // Mid-Tier stuff
-        if (Random.value < 0.25f) nickelAmount = Random.Range(40f, 160f) * maxHealth / 10;
-        if (Random.value < 0.15f) cobaltAmount = Random.Range(32f, 150f) * maxHealth / 10;
-        if (Random.value < 0.10f) helium3Amount = Random.Range(1f, 5f) * maxHealth / 10;
+        //if (Random.value < 0.25f) nickelAmount = Random.Range(40f, 160f) * maxHealth / 10;
+        //if (Random.value < 0.15f) cobaltAmount = Random.Range(32f, 150f) * maxHealth / 10;
+        //if (Random.value < 0.10f) helium3Amount = Random.Range(1f, 5f) * maxHealth / 10;
 
         //RICHES!!!
-        if (Random.value < 0.025f) diamondAmount = Random.Range(0.8f, 7f) * maxHealth / 10;      // 2.5% chance
-        if (Random.value < 0.015f) platiniumAmount = Random.Range(0.5f, 3f) * maxHealth / 10;  // 1.5% chance
-        if (Random.value < 0.005f) plutoniumAmount = Random.Range(0.5f, 2f) * maxHealth / 10; // 0.5% chance
-
-        isToxic = plutoniumAmount > 0 || Random.value < 0.01f; // Plutonium OR 1% random chance
+        //if (Random.value < 0.025f) diamondAmount = Random.Range(0.8f, 7f) * maxHealth / 10;      // 2.5% chance
+        //if (Random.value <= 0.005f) platiniumAmount = Random.Range(0.5f, 3f) * maxHealth / 10;  // 0.5% chance
+        //if (Random.value <= 0.001f) plutoniumAmount = Random.Range(0.5f, 2f) * maxHealth / 10; // 0.1% chance
 
         //TOTAL VALUE CALCULATIONS
         totalValue += ironAmount * 0.8f;
@@ -228,7 +368,7 @@ public class Mineable : MonoBehaviour
         float laserBonus = 1f + (laserIntensity * 2f);
         float effectiveMiningRate = baseMiningRate * laserBonus;
 
-        // Group 1 – Low melting point
+        // Group 1 â€“ Low melting point
         if (laserIntensity >= 0.0f && laserIntensity <= 0.25f)
         {
             float minedIce = Mathf.Min(iceAmount, iceAmount * effectiveMiningRate);
@@ -248,7 +388,7 @@ public class Mineable : MonoBehaviour
             clayAmount -= minedClay;
         }
 
-        // Group 2 – Medium melting point
+        // Group 2 â€“ Medium melting point
         if (laserIntensity >= 0.2f && laserIntensity <= 0.55f)
         {
             float minedMagnesium = Mathf.Min(magnesiumAmount, magnesiumAmount * effectiveMiningRate);
@@ -274,7 +414,7 @@ public class Mineable : MonoBehaviour
             clayAmount -= minedClay;
         }
 
-        // Group 3 – High melting point
+        // Group 3 â€“ High melting point
         if (laserIntensity >= 0.5f && laserIntensity <= 0.8f)
         {
             float minedNickel = Mathf.Min(nickelAmount, nickelAmount * effectiveMiningRate);
@@ -306,7 +446,7 @@ public class Mineable : MonoBehaviour
             cobaltAmount -= minedCobalt;
         }
 
-        // Group 4 – Extreme melting point
+        // Group 4 â€“ Extreme melting point
         if (laserIntensity >= 0.75f && laserIntensity <= 1.0f)
         {
             float minedNickel = Mathf.Min(nickelAmount, nickelAmount * effectiveMiningRate);
@@ -456,7 +596,7 @@ public class Mineable : MonoBehaviour
             }
         }
 
-        if (health == maxHealth)
+        if (health == maxHealth && asteroidMat.HasFloat("_BlendFactor"))
         {
             asteroidMat.SetFloat("_BlendFactor", 0f);
         }
@@ -464,7 +604,7 @@ public class Mineable : MonoBehaviour
         if (laserTouching)
         {
             PopUp.GetComponent<Animator>().SetBool("shouldShow", false);
-            if (health < maxHealth && gameObject == gun.Target && asteroidMat)
+            if (health < maxHealth && gameObject == gun.Target && asteroidMat.HasFloat("_BlendFactor"))
             {
                 totalBlend += meltSpeed * Time.deltaTime;
                 totalBlend = Mathf.Clamp01((float)totalBlend);
@@ -492,9 +632,12 @@ public class Mineable : MonoBehaviour
         else if (!laserTouching && health < maxHealth)
         {
             timer1 = 0f;
-            totalBlend -= meltSpeed * Time.deltaTime;
-            totalBlend = Mathf.Clamp01((float)totalBlend);
-            asteroidMat.SetFloat("_BlendFactor", totalBlend);
+            if (asteroidMat.HasFloat("_BlendFactor"))
+            {
+                totalBlend -= meltSpeed * Time.deltaTime;
+                totalBlend = Mathf.Clamp01((float)totalBlend);
+                asteroidMat.SetFloat("_BlendFactor", totalBlend);
+            }
         }
         if (asteroidHealthToShare <= deathPercent && isDestroyed == false && gameObject == gun.Target)
         {
@@ -504,7 +647,10 @@ public class Mineable : MonoBehaviour
             cameraShake.shakeFactor = (100f / gun.Distance);
             StartCoroutine(cameraShake.SHAKE());
             healthScript.health -= Mathf.Round((maxHealth / gun.Distance) * 3f);
-            asteroidMat.SetFloat("_BlendFactor", 0f);
+            if (asteroidMat.HasFloat("_BlendFactor"))
+            {
+                asteroidMat.SetFloat("_BlendFactor", 0f);
+            }
             GameObject temp = Instantiate(explosion.gameObject, gameObject.transform.position, Quaternion.identity);
             temp.SetActive(true);
             gameObject.GetComponent<MeshCollider>().enabled = false;
