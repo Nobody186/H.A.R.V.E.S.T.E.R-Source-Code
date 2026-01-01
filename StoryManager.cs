@@ -23,6 +23,8 @@ public class StoryManager : MonoBehaviour
 
     [SerializeField] GameObject settingsMenu;
     public Slider volumeSlider;
+    public Slider dialogSlider;
+    public Slider sfxSlider;
     [SerializeField] AudioMixer audioMixer;
     [SerializeField] TMP_Dropdown resolutionChooser;
     [SerializeField] Toggle fullScreenBox;
@@ -60,7 +62,7 @@ public class StoryManager : MonoBehaviour
     [SerializeField] PlayerController player;
     bool isMoused;
 
-    bool playingStoryMessage = false;
+    public bool playingStoryMessage = false;
 
     bool showedWarpTip = false;
     bool showedWarpTip2 = false;
@@ -192,8 +194,9 @@ public class StoryManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-
         audioMixer.SetFloat("Music", Mathf.Log10(volumeSlider.value) * 20);
+        audioMixer.SetFloat("Dialog", Mathf.Log10(dialogSlider.value) * 20);
+        audioMixer.SetFloat("Effects", Mathf.Log10(dialogSlider.value) * 20);
 
         if (Input.GetKeyDown(KeyCode.Escape))
         {
@@ -210,7 +213,7 @@ public class StoryManager : MonoBehaviour
             }
             else
             {
-                if (!alreadyDisabledCursor)
+                if (!alreadyDisabledCursor && mouseMode)
                 {
                     Cursor.visible = false;
                     alreadyDisabledCursor = true;
@@ -266,7 +269,6 @@ public class StoryManager : MonoBehaviour
             else
                 currentObjectives += "MINE " + Mathf.Round(console.nickelQuota / 1000f) + "K NICKEL ORE\n";
         }
-        // Similar for other quotas...
 
         // Add other objectives
         for (int i = 0; i < objectives.Count; i++)
@@ -337,25 +339,26 @@ public class StoryManager : MonoBehaviour
         //    showedWarpTip2 = true;
         //    StartCoroutine(playNextStep(tutorialMessages[0], true, "[Z]\nTO WARP!", false, "", KeyCode.Z, false));
         //}
-        if(!showedBookTip && appForTutorial.activeSelf)
+        if(!showedBookTip && appForTutorial.activeSelf && !playingStoryMessage)
         {
             showedBookTip = true;
             List<string> caps = new List<string>();
             List<float> times = new List<float>();
-            times.Add(0);
+            
             caps.Add("Okay. I got you a 24 hour subscription so you may familarize yourself with more of your ship's systems.");
-            times.Add(6);
+            times.Add(0f);
             caps.Add("We've placed an empty ship directly in front of you. Sometimes, wrecks like to broadcast data...");
-            times.Add(12);
+            times.Add(6f);
             caps.Add("Remember. It is SUPER DUPER ILLEGAL to download unauthorized signals. This one is company approved.");
-            times.Add(20);
+            times.Add(12f);
             caps.Add("Here are the instructions: MOVE FORWARDS UNTIL YOU SEE A TRACKING ICON.");
-            times.Add(24);
+            times.Add(20f);
             caps.Add("CLICK ON THE ICON.");
-            times.Add(27);
+            times.Add(24f);
             caps.Add("OPEN THE MONITOR. OPEN THE DATA APP, AND THEN PRESS 'DOWNLOAD'.");
+            times.Add(27f);
 
-            StartCoroutine(playNextStep(tutorialMessages[2], true, "[SHIFT]\nTO MOVE FORWARD", false, "", KeyCode.LeftShift, true, caps, times));
+            StartCoroutine(playNextStep(tutorialMessages[2], true, "[SHIFT]\nTO MOVE FORWARD", false, "", KeyCode.LeftShift, true, caps, times, true));
         }
     }
 
@@ -405,27 +408,30 @@ public class StoryManager : MonoBehaviour
     }
 
     //A generic function to play an audio source, and show some text on the player's screen.
-    public IEnumerator playNextStep(AudioSource message, bool showControlText, string controlText, bool showObjectiveNotif, string objectiveText, KeyCode bindToPress, bool customInstruction, List<string> subtitles, List<float> timestamps) //Timestamps should be like : 4.2 seconds
+    public IEnumerator playNextStep(AudioSource message, bool showControlText, string controlText, bool showObjectiveNotif, string objectiveText, KeyCode bindToPress, bool customInstruction, List<string> subtitles, List<float> timestamps, bool freezePlayer) //Timestamps should be like : 4.2 seconds
     {
-        captions.gameObject.SetActive(true);
-        float timer = 0;
-        int index = 0;
         while(playingStoryMessage) //WE RUN THIS LOOP TO ENSURE WE DONT OVERLAP WITH ALREADY PLAYING MESSAGES.
         {
             yield return null;
         }
+        captions.gameObject.SetActive(true);
+        float timer = 0f;
+        int index = 0;
         playingStoryMessage = true;
-        if (showControlText)
-        {
-            player.canMove = false;
-        }
+        player.canMove = !freezePlayer;
         message.Play();
         float soundLength = message.clip.length;
         bool finishedMessage = false;
-        while(!finishedMessage)
+
+        captions.text = subtitles[0];
+        while (!finishedMessage) //While we're playing our message, keep the captions updated.
         {
+            if (console.canWarp)
+            {
+                player.canMove = !freezePlayer;
+            }
             captions.text = subtitles[index];
-            timer = message.time;
+            timer += Time.deltaTime;
             if (index < subtitles.Count - 1 && timer >= timestamps[index+1])
             {
                 index += 1;
@@ -434,33 +440,31 @@ public class StoryManager : MonoBehaviour
             {
                 finishedMessage = true;
             }
+            print("TIMER:" + timer+ "\nCLIP LENGTH: " + soundLength);
             yield return null;
         }
-        if(showControlText )
+        if(showControlText)
         {
             controlTip.SetActive(true);
             controlTipText.text = controlText;
         }
-        if(showObjectiveNotif)
-        {
-            objectiveAddedTip.SetActive(true);
-            objectives.Add(objectiveText);
-        }
+
         Vector2 currentSize = controlTip.GetComponent<RectTransform>().sizeDelta;
         if (customInstruction)
         {
             controlTip.GetComponent<RectTransform>().sizeDelta = new Vector2(currentSize.x*5f, currentSize.y);
         }
-        while(!Input.GetKeyDown(bindToPress) && showControlText)
+        while(!Input.GetKeyDown(bindToPress) && showControlText) //If we're ought to show a keybind hint, don't leave before we get it.
         {
             yield return null;
         }
-        player.canMove = true;
+        if (console.canWarp) //just a small little anti-game breaking guardrail
+        {
+            player.canMove = true;
+        }
         controlTip.GetComponent<RectTransform>().sizeDelta = currentSize;
         controlTip.SetActive(false);
-        yield return new WaitForSeconds(2.5f);
-        objectiveAddedTip.SetActive(false);
-        playingStoryMessage = false;
         captions.gameObject.SetActive(false);
+        playingStoryMessage = false;
     }
 }
