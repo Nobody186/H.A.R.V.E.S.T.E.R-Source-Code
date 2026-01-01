@@ -234,10 +234,10 @@ public class ConsoleController : MonoBehaviour
             }
         }
         health.health = playerHealth;
-        if(day == 0 && SceneManager.GetActiveScene().name != "Tutorial")
+        if(day == 0 && SceneManager.GetActiveScene().name != "Tutorial") //Day 1 of the actual game.
         {
             day += 1;
-            lifeSupportDuration = 25;
+            lifeSupportDuration = 30; //Half an hour to figure out the basics.
         }
         
         else if(SceneManager.GetActiveScene().name == "Tutorial")
@@ -255,57 +255,76 @@ public class ConsoleController : MonoBehaviour
 
 
         //SET DAILY QUOTAS
-        // Quota system: Max 4 quotas per day, no ultra-rare materials
+        // Quota system: 
         // Ultra-rare materials (plutonium, platinum, diamond) are bonus rewards only
         if (day != 0)
         {
             List<System.Action> potentialQuotas = new List<System.Action>();
             int currentQuotaCount = 0;
 
-            // TIER 1: COMMON RESOURCES (High priority, almost always included)
-
+            // TIER 1: COMMON RESOURCES (High priority, almost always included). Each player gets one common resource to mine.
+            int commonOreType;
             // IRON - Most reliable resource
-            potentialQuotas.Add(() =>
+            if (day < 2)
             {
-                if (Random.value < 0.95f && currentQuotaCount < 4)
-                {
-                    float baseIronQuota = Random.Range(80000f, 200000f);
-                    ironQuota = baseIronQuota * (1f + (day * 0.15f));
-                    currentQuotaCount++;
-                }
-            });
-
-            // CLAY - Common alternative to iron
-            potentialQuotas.Add(() =>
+                commonOreType = Random.Range(0, 2);
+            }
+            else
             {
-                if (Random.value < 0.7f && currentQuotaCount < 4)
-                {
-                    float baseClayQuota = Random.Range(80000, 140000f);
-                    clayQuota = baseClayQuota * (1f + (day * 0.12f));
-                    currentQuotaCount++;
-                }
-            });
-
-            // ICE - Critical survival resource
-            potentialQuotas.Add(() =>
+                commonOreType = Random.Range(0, 3);
+            }
+            if (commonOreType == 0)
             {
-                if (Random.value < 0.8f && currentQuotaCount < 4)
+                potentialQuotas.Add(() =>
                 {
-                    float baseIceQuota = Random.Range(8000f, 15000f);
-                    iceQuota = baseIceQuota * Mathf.Pow(day, 1.2f); // Grows with urgency
+                    if (Random.value < 0.95f && currentQuotaCount < 4)
+                    {
+                        float baseIronQuota = Random.Range(60000f, 120000f);
+                        ironQuota = baseIronQuota * (1f + (day * 0.036f));
+                        currentQuotaCount++;
+                    }
+                });
+            }
+            if (commonOreType == 1)
+            {
+                // CLAY - Common alternative to iron
+                potentialQuotas.Add(() =>
+                {
+                    if (Random.value < 0.7f && currentQuotaCount < 4)
+                    {
+                        float baseClayQuota = Random.Range(80000, 140000f);
+                        clayQuota = baseClayQuota * (1f + (day * 0.036f));
+                        currentQuotaCount++;
+                    }
+                });
+            }
+            else
+            {
+                // ICE - Critical survival resource. Start demanding on later days.
+                potentialQuotas.Add(() =>
+                {
+                    float baseIceQuota = Random.Range(4000f, 9000f);
+                    if (day <= 7)
+                    {
+                        iceQuota = baseIceQuota * Mathf.Pow(day, 0.8f); // Grows with urgency
+                    }
+                    else
+                    {
+                        iceQuota = baseIceQuota * Mathf.Pow(7, 0.8f);
+                    }
                     currentQuotaCount++;
-                }
-            });
+                });
+            }
 
             // TIER 2: MID-TIER RESOURCES (Moderate challenge)
 
             // MAGNESIUM - Requires selective asteroid choice
             potentialQuotas.Add(() =>
             {
-                if (Random.value < 0.5f && currentQuotaCount < 4)
+                if (Random.value < 0.8f && currentQuotaCount < 4)
                 {
                     float baseMagQuota = Random.Range(25000f, 45000f);
-                    magnesiumQuota = baseMagQuota * (1f + (day * 0.2f));
+                    magnesiumQuota = baseMagQuota * (1f + (day * 0.08f));
                     currentQuotaCount++;
                 }
             });
@@ -316,74 +335,74 @@ public class ConsoleController : MonoBehaviour
                 if (Random.value < 0.5f && currentQuotaCount < 4)
                 {
                     float baseAlumQuota = Random.Range(20000f, 35000f);
-                    aluminumQuota = baseAlumQuota * (1f + (day * 0.2f));
+                    aluminumQuota = baseAlumQuota * (1f + (day * 0.08f));
                     currentQuotaCount++;
                 }
             });
 
-            // HYDROGEN - Fuel/survival resource
-            potentialQuotas.Add(() =>
+            if (day > 2)
             {
-                if (Random.value < 0.4f && currentQuotaCount < 4)
-                {
-                    float baseHydroQuota = Random.Range(6000f, 12000f);
-                    hydrogenQuota = baseHydroQuota * (1f + (day * 0.25f));
-                    currentQuotaCount++;
-                }
-            });
-
-            // CARBON - Mid-tier resource (available after day 2)
-            if (day >= 2)
-            {
+                // HYDROGEN - Fuel/survival resource
                 potentialQuotas.Add(() =>
                 {
-                    if (Random.value < 0.35f && currentQuotaCount < 4)
+                    if (Random.value < 0.4f && currentQuotaCount < 4)
                     {
-                        float baseCarbonQuota = Random.Range(1000f, 2500f);
-                        carbonQuota = baseCarbonQuota * (1f + (day * 0.25f));
+                        float baseHydroQuota = Random.Range(6000f, 12000f);
+                        hydrogenQuota = baseHydroQuota * (1f + (day * 0.05f));
                         currentQuotaCount++;
                     }
                 });
-            }
 
-            // TIER 3: CHALLENGING RESOURCES (Require strategy and luck)
-
-            // COBALT - Forces players to hunt specific asteroids
-            potentialQuotas.Add(() =>
-            {
-                if (Random.value < 0.3f && currentQuotaCount < 4)
+                // CARBON - Mid-tier resource (available after day 2)
+                if (day > 2)
                 {
-                    float baseCobaltQuota = Random.Range(2500f, 6000f);
-                    cobaltQuota = baseCobaltQuota * (1f + (day * 0.3f));
-                    currentQuotaCount++;
+                    potentialQuotas.Add(() =>
+                    {
+                        if (Random.value < 0.35f && currentQuotaCount < 4)
+                        {
+                            float baseCarbonQuota = Random.Range(1000f, 2500f);
+                            carbonQuota = baseCarbonQuota * (1f + (day * 0.05f));
+                            currentQuotaCount++;
+                        }
+                    });
                 }
-            });
 
-            // NICKEL - Selective mining required
-            potentialQuotas.Add(() =>
-            {
-                if (Random.value < 0.25f && currentQuotaCount < 4)
-                {
-                    float baseNickelQuota = Random.Range(1200f, 3500f);
-                    nickelQuota = baseNickelQuota * (1f + (day * 0.35f));
-                    currentQuotaCount++;
-                }
-            });
-
-            // HELIUM-3 - Requires max laser intensity (late game)
-            if (day >= 3)
-            {
+                // COBALT - Forces players to hunt specific asteroids
                 potentialQuotas.Add(() =>
                 {
-                    if (Random.value < 0.12f && currentQuotaCount < 4)
+                    if (Random.value < 0.3f && currentQuotaCount < 4)
                     {
-                        float baseHeliumQuota = Random.Range(25f, 60f);
-                        helium3Quota = baseHeliumQuota * (day - 2);
+                        float baseCobaltQuota = Random.Range(2500f, 6000f);
+                        cobaltQuota = baseCobaltQuota * (1f + (day * 0.05f));
                         currentQuotaCount++;
                     }
                 });
-            }
 
+                // NICKEL - Selective mining required
+                potentialQuotas.Add(() =>
+                {
+                    if (Random.value < 0.25f && currentQuotaCount < 4)
+                    {
+                        float baseNickelQuota = Random.Range(1200f, 3500f);
+                        nickelQuota = baseNickelQuota * (1f + (day * 0.05f));
+                        currentQuotaCount++;
+                    }
+                });
+
+                // HELIUM-3 (Later game. WP3 necessary)
+                if (day > 3)
+                {
+                    potentialQuotas.Add(() =>
+                    {
+                        if (Random.value < 0.12f && currentQuotaCount < 4)
+                        {
+                            float baseHeliumQuota = Random.Range(25f, 60f);
+                            helium3Quota = baseHeliumQuota * (1f+(day - 2f)*0.03f);
+                            currentQuotaCount++;
+                        }
+                    });
+                }
+            }
             // Shuffle the list to randomize quota selection order
             for (int i = 0; i < potentialQuotas.Count; i++)
             {
@@ -400,19 +419,33 @@ public class ConsoleController : MonoBehaviour
                 quotaAction();
             }
 
-            // SAFETY NET: Ensure at least 2 quotas are assigned
-            if (currentQuotaCount < 2)
+            // SAFETY NET: Ensure at least 4 quotas are assigned
+            if (currentQuotaCount < 4)
             {
                 // Force iron quota if we don't have enough
                 if (ironQuota == 0)
                 {
-                    float baseIronQuota = Random.Range(180000f, 350000f);
-                    ironQuota = baseIronQuota * (1f + (day * 0.15f));
+                    float baseIronQuota = Random.Range(60000f, 120000f);
+                    ironQuota = baseIronQuota * (1f + (day * 0.036f));
+                    currentQuotaCount++;
+                }
+
+                if(currentQuotaCount < 4 && clayQuota == 0)
+                {
+                    float baseClayQuota = Random.Range(80000, 140000f);
+                    clayQuota = baseClayQuota * (1f + (day * 0.036f));
+                    currentQuotaCount++;
+                }
+
+                if(currentQuotaCount < 4 && magnesiumQuota == 0)
+                {
+                    float baseMagQuota = Random.Range(25000f, 45000f);
+                    magnesiumQuota = baseMagQuota * (1f + (day * 0.08f));
                     currentQuotaCount++;
                 }
 
                 // Force ice quota if we still need more
-                if (currentQuotaCount < 2 && iceQuota == 0)
+                if (currentQuotaCount < 4 && iceQuota == 0)
                 {
                     float baseIceQuota = Random.Range(7000f, 12000f);
                     iceQuota = baseIceQuota * Mathf.Pow(day, 1.2f);
@@ -686,21 +719,17 @@ public class ConsoleController : MonoBehaviour
                 {
                     predictedHealth.text = "PTI: " + gunController.Target.GetComponent<Mineable>().asteroidHealthToShare.ToString() + "%";
                 }
-                else if (gunController.Target.name.Contains("Pirate"))
+                else if (gunController.Target.name.Contains("Enemy"))
                 {
-                    predictedHealth.text = "TARGET HULL: " + gunController.Target.GetComponent<EnemyHealth>().health;
-                }
-                else if(gunController.Target.name.Contains("EnemyMining"))
-                {
-                    predictedHealth.text = "TARGET HULL: " + gunController.Target.GetComponent<EnemyHealth>().health;
-                }
-                else if(gunController.Target.name.Contains("Enemy"))
-                {
-                    predictedHealth.text = "TARGET HULL: " + gunController.Target.GetComponent<EnemyHealth>().health;
-                }
-                else if(gunController.Target.name.Contains("dummy"))
-                {
-                    predictedHealth.text = "TARGET HULL: " + gunController.Target.GetComponent<EnemyHealth>().health;
+                    float enemHealth = gunController.Target.GetComponent<EnemyHealth>().health;
+                    if (enemHealth > 0)
+                    {
+                        predictedHealth.text = "TARGET HULL: " + gunController.Target.GetComponent<EnemyHealth>().health;
+                    }
+                    else
+                    {
+                        predictedHealth.text = "DESTRUCTION IMMINENT";
+                    }
                 }
                 else if(gunController.Target.name.Contains("Data"))
                 {
@@ -794,7 +823,7 @@ public class ConsoleController : MonoBehaviour
 
                         for (int i = 0; i < allObjects.Length; i++)
                         {
-                            if (allObjects[i].transform.parent == null && allObjects[i].transform != transform)
+                            if ((allObjects[i].transform.parent == null && allObjects[i].transform != transform))
                             {
                                 allObjects[i].transform.position = allObjects[i].transform.position + (-transform.position);
                             }
@@ -908,7 +937,7 @@ public class ConsoleController : MonoBehaviour
             caps.Add("I've added some coordinates into you navigation system labeled 'THE FIRING RANGE'.");
             times.Add(6);
             caps.Add("Head over there as soon as you can. Please.");
-            StartCoroutine(storyManager.playNextStep(tutorialMessage2, false, "", true, "GO TO THE FIRING RANGE", KeyCode.None, false, caps, times));
+            StartCoroutine(storyManager.playNextStep(tutorialMessage2, false, "", true, "GO TO THE FIRING RANGE", KeyCode.None, false, caps, times, false));
             playedTutMessage2 = true;
             waypointToAdd = allWaypoints[2];
             AddPoint();
@@ -1040,7 +1069,7 @@ public class ConsoleController : MonoBehaviour
             caps.Add("Open the navigation app, and then choose T-ZONE 1 as your selected waypoint.");
             times.Add(8);
             caps.Add("After that, initiate the warp.");
-            StartCoroutine(storyManager.playNextStep(tutorialMessage1, false, "[M]\nFOR NAVIGATION MODE", false, "WARP TO T-ZONE 1", KeyCode.None, false, caps, times));
+            StartCoroutine(storyManager.playNextStep(tutorialMessage1, false, "[M]\nFOR NAVIGATION MODE", false, "WARP TO T-ZONE 1", KeyCode.None, false, caps, times, false));
         }
         monitor.downloadedData = true;
         alreadyPressed = true;
