@@ -490,7 +490,7 @@ public class EnemyMovement : MonoBehaviour
 
     private void ExecuteChase()
     {
-        if (isDisc && enemHealth.health > 0) //This allows us to play a pirate voice line through the console script
+        if (isDisc && enemHealth.health > 0 && !console.beingPirateAttacked) //This allows us to play a pirate voice line through the console script. 2nd Condition is meant to prevent bugs when 2 pirates attack at once.
         {
             console.beingAmbushed = false;
             console.beingPirateAttacked = true;
