@@ -18,6 +18,7 @@ public class storyTrigger : MonoBehaviour
     [SerializeField] List<string> caps;
     [SerializeField] List<float> times;
 
+    [SerializeField] bool freezePlayer;
     float timer = 0f;
     float clipTime = 0f;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -31,7 +32,7 @@ public class storyTrigger : MonoBehaviour
         if (!alreadyTriggered && other.gameObject.name == "PlayerShip" && !dayIntro.activeSelf)
         {
             alreadyTriggered = true;
-            StartCoroutine(storyManager.playNextStep(messageToPlay, showKeybindMessage, keybindMessage, showObjectiveMessage, objectiveName, keybind, longKeybindName, caps, times));
+            StartCoroutine(storyManager.playNextStep(messageToPlay, showKeybindMessage, keybindMessage, showObjectiveMessage, objectiveName, keybind, longKeybindName, caps, times, freezePlayer));
             print("TRIGGER FIRED!");
             clipTime = messageToPlay.clip.length;
         }
