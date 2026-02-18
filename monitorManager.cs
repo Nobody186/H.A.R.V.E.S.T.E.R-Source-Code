@@ -2,7 +2,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using System;
 
 public class monitorManager : MonoBehaviour
 {
@@ -29,6 +28,8 @@ public class monitorManager : MonoBehaviour
     bool awaitingConfirmation = false;
     [SerializeField] TextMeshProUGUI warpButtonText;
     [SerializeField] GameObject errorPanel;
+    [SerializeField] GameObject jammerPanel;
+    [SerializeField] Slider jammerSlider;
 
     //For scan menu
     [SerializeField] GunController gun;
@@ -50,6 +51,8 @@ public class monitorManager : MonoBehaviour
     [SerializeField] TextMeshProUGUI quotaText;
     public bool downloadedData = false;
 
+    bool transitioning = false;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -63,7 +66,23 @@ public class monitorManager : MonoBehaviour
     {
         timer += Time.deltaTime;
 
-        if (Input.GetKeyDown(KeyCode.F) && timer > 1)
+        if(console.warpJammed)
+        {
+            jammerSlider.value += Time.deltaTime;
+            if (jammerSlider.value >= jammerSlider.maxValue)
+            {
+                console.warpJammed = false;
+                jammerSlider.value = 0f;
+                jammerPanel.SetActive(false);
+            }
+        }
+
+        if((console.canWarp && appLoaded != null && appLoaded.name != "navInfo") || (console.canWarp && appLoaded == null))
+        {
+            console.navMode = false;
+        }
+
+        if (Input.GetKeyDown(KeyCode.F) && timer > 1f && !transitioning && !loadingApp)
         {
             timer = 0;
             monitorOn = !monitorOn;
@@ -116,23 +135,24 @@ public class monitorManager : MonoBehaviour
 
     public IEnumerator closeMonitor()
     {
+        transitioning = true;
         emitter.Stop();
         monitorOn = false;
         monitorAnimator.SetBool("shouldShow", false);
         orbAnimatior.SetBool("shouldShow", false);
         yield return new WaitForSeconds(0.2f);
-        appLoaded.SetActive(false);
-        yield return new WaitForSeconds(0.8f);
+        if (appLoaded != null && appLoaded.activeSelf)
+        {
+            appLoaded.SetActive(false);
+        }
+        yield return new WaitForSeconds(0.7f);
         frame.SetActive(false);
         orb.SetActive(false);
         appLoaded = null;
         appToLoad = null;
         loadingApp = false;
         downloadedData = false;
-        if (!console.isWarping && console.canWarp)
-        {
-            console.navMode = false;
-        }
+        transitioning = false;
     }
 
     public void loadApp(GameObject app)
@@ -168,7 +188,6 @@ public class monitorManager : MonoBehaviour
                 scanButton.SetActive(true);
             }
         }
-
         yield return new WaitForSeconds(0.4f);
         loadingScreen.SetActive(false);
         appLoaded = appToLoad;
@@ -178,11 +197,11 @@ public class monitorManager : MonoBehaviour
     //App-specific functions
     public void InitiateWarp()
     {
-        if (awaitingConfirmation && !console.isWarping && console.fusionCells >= 1)
+        if (awaitingConfirmation && !console.isWarping && console.fusionCells >= 1 && console.canWarp)
         {
             StartCoroutine(console.Warp());
         }
-        else if (!awaitingConfirmation && !console.isWarping && console.fusionCells >= 1)
+        else if (!awaitingConfirmation && !console.isWarping && console.fusionCells >= 1 && console.canWarp && Vector3.Distance(console.waypoints[console.currentWaypoint].transform.position, transform.position) > 10000f)
         {
             StartCoroutine(WarpConfirmation());
         }
@@ -191,6 +210,12 @@ public class monitorManager : MonoBehaviour
     void handleNavMenuLogic()
     {
         console.navMode = true;
+
+        if(console.warpJammed)
+        {
+            jammerPanel.SetActive(true);
+        }
+
         if(console.isWarping)
         {
             errorPanel.SetActive(true);
