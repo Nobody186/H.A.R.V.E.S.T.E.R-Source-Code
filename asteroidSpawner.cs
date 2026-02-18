@@ -25,11 +25,6 @@ public class asteroidSpawner : MonoBehaviour
 
     private List<GameObject> childrenAsteroids = new List<GameObject>();
 
-    bool waiting = false;
-
-    private float timer = 0f;
-    private float timeToSpawn = 0f;
-
     bool canSpawn = false;
 
     static readonly int baseColorID = Shader.PropertyToID("_BaseColor"); //I'm pretty sure I did this stuff while playing around with GPU instancing. Don't touch it, I'm not fully sure what it does.
@@ -92,11 +87,10 @@ public class asteroidSpawner : MonoBehaviour
                     childrenAsteroids.Add(newAsteroid);
                     asteroid = asteroidExamples[Random.Range(0, asteroidExamples.Count)];
                     canSpawn = false;
-                    waiting = false;
                 }
             }
         }
-        else 
+        else //This should never run but Im keeping this here just in case I decide to destroy my game for whatever reason.
         {
             float distance = Vector3.Distance(transform.position, spawnPoint.position);
             if (distance > smallDistance && distance < midDistance)
@@ -124,9 +118,14 @@ public class asteroidSpawner : MonoBehaviour
         }
         else if(Distance > 20000f && childrenAsteroids[childrenAsteroids.Count-1].activeSelf == true)
         {
-            foreach (GameObject obj in childrenAsteroids)
+            for (int i = childrenAsteroids.Count-1; i >= 0; i--)
             {
-                obj.SetActive(false);
+                if (childrenAsteroids[i] == null)
+                {
+                    childrenAsteroids.Remove(childrenAsteroids[i]);
+                    continue;
+                }
+                childrenAsteroids[i].SetActive(false);
             }
         }
         //Commented all of this out because as of right now, we don't need to spawn asteroids after the start() method. But things may change, who knows?
@@ -227,7 +226,7 @@ public class asteroidSpawner : MonoBehaviour
                 }
             }
 
-            // Give the GPU & CPU a breather
+            //Give the GPU & CPU a breather
             yield return null;
         }
     }
