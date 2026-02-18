@@ -16,6 +16,8 @@ public class StoryManager : MonoBehaviour
     [SerializeField] List<string> objectives;
     public List<string> objectivesToPrint;
     private string allObjectives;
+    [SerializeField] GameObject confirmBackToMenu;
+    [SerializeField] GameObject confirmExitApp;
 
     //For pause menu
     [SerializeField] GameObject pauseMenu;
@@ -31,7 +33,6 @@ public class StoryManager : MonoBehaviour
 
     [SerializeField] Toggle mouseMode;
 
-    [SerializeField] GameObject tipsMenu;
 
     Resolution[] AllResolutions;
     bool fullScreened;
@@ -44,33 +45,49 @@ public class StoryManager : MonoBehaviour
     [SerializeField] TextMeshProUGUI captions;
     [SerializeField] List<AudioSource> pirateChatters;
     [SerializeField] List<AudioSource> pirateAmbush;
-    [SerializeField] AudioSource chaseMusic;
-    [SerializeField] AudioSource lastMinuteMessage;
+
+
     [SerializeField] List<AudioSource> tutorialMessages;
+
+    [SerializeField] List<AdSet> ads;
+
+    int quotasMet = 0;
+
+    bool quota1met = false;
+    bool quota2met = false;
+    bool quota3met = false;
+    bool quota4met = false;
+    bool quota5met = false;
+    bool quota6met = false;
+    bool quota7met = false;
+    bool quota8met = false;
+    bool quota9met = false;
+    bool quota10met = false;
 
     [SerializeField] GameObject appForTutorial;
 
     [SerializeField] GameObject objectiveAddedTip;
     [SerializeField] GameObject controlTip;
+    [SerializeField] GameObject whiteout;
+    [SerializeField] GameObject radioLight;
     private TextMeshProUGUI controlTipText;
 
     bool recentPirateAttackQuip = false;
     bool recentPirateAmbushQuip = false;
 
-    bool alreadyDisabledCursor = false;
 
     [SerializeField] PlayerController player;
-    bool isMoused;
 
+    private Queue<StoryMessage> storyQueue = new Queue<StoryMessage>(); //A queue that stores all of our storymessages.
     public bool playingStoryMessage = false;
-
-    bool showedWarpTip = false;
-    bool showedWarpTip2 = false;
-    bool showedWarpTip3 = false;
 
     bool showedBookTip = false;
 
-    Vector2 OGSize = new Vector2();
+    [SerializeField] GameObject Redactor;
+    [SerializeField] Slider jammerSlider;
+
+    float staggeredUpdateTimer = 0f;
+    float staggeredUpdateInterval = .5f;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
 
@@ -92,219 +109,30 @@ public class StoryManager : MonoBehaviour
         }
         resolutionChooser.AddOptions(availableResolutions);
 
-        if (console.ironQuota > 0)
-        {
-            objectivesToPrint.Add("MINE " + Mathf.Round(console.ironQuota / 1000f)+ "K IRON ORE");
-        }
-        if (console.cobaltQuota > 0)
-        {
-            objectivesToPrint.Add("MINE " + Mathf.Round(console.cobaltQuota / 1000f) + "K COBALT ORE");
-        }
-        if (console.iceQuota > 0)
-        {
-            objectivesToPrint.Add("MINE " + Mathf.Round(console.iceQuota / 1000f) + "K ICE");
-        }
-        if (console.nickelQuota > 0)
-        {
-            objectivesToPrint.Add("MINE " + Mathf.Round(console.nickelQuota / 1000f) + "K NICKEL ORE");
-        }
-        if (objectives.Count > 0)
-        {
-            for (int i = 0; i < objectives.Count; i++)
-            {
-                objectivesToPrint.Add(objectives[i]);
-            }
-        }
-        for(int i = 0; i < objectivesToPrint.Count; i++)
-        {
-            allObjectives += (objectivesToPrint[i] + "\n");
-        }
+        radioLight.SetActive(false);
 
         mouseMode.isOn = console.usesMouseMode;
         controlTipText = controlTip.GetComponentInChildren<TextMeshProUGUI>();
         Vector2 OGSize = controlTip.GetComponent<RectTransform>().sizeDelta;
-    }
 
-    void changeObjectiveColors()
-    {
-        for(int i = 0; i < objectives.Count; i++)
-        {
-            //IRON
-            if (objectives[i].Contains("IRON") && console.ironHeld >= console.ironQuota)
-            {
-                objectives[i] = "IRON QUOTA MET!";
-                allObjectives = allObjectives.Replace("MINE " + Mathf.Round(console.ironQuota / 1000f) + "K IRON ORE", "IRON QUOTA MET!");
-            }
-            else if (objectives[i].Contains("IRON") && console.ironHeld < console.ironQuota)
-            {
-                objectives[i] = "MINE " + Mathf.Round(console.ironQuota / 1000f) + "K IRON ORE";
-                if (allObjectives.Contains("IRON QUOTA MET"))
-                {
-                    allObjectives = allObjectives.Replace("IRON QUOTA MET!", "MINE " + Mathf.Round(console.ironQuota / 1000f) + "K IRON ORE");
-                }
-            }
-
-            // COBALT
-            if (objectives[i].Contains("COBALT") && console.cobaltHeld >= console.cobaltQuota)
-            {
-                objectives[i] = "COBALT QUOTA MET!";
-                allObjectives = allObjectives.Replace("MINE " + Mathf.Round(console.cobaltQuota / 1000f) + "K COBALT ORE", "COBALT QUOTA MET!");
-            }
-            else if (objectives[i].Contains("COBALT") && console.cobaltHeld < console.cobaltQuota)
-            {
-                objectives[i] = "MINE " + Mathf.Round(console.cobaltQuota / 1000f) + "K COBALT ORE";
-                if (allObjectives.Contains("COBALT QUOTA MET"))
-                {
-                    allObjectives = allObjectives.Replace("COBALT QUOTA MET!", "MINE " + Mathf.Round(console.cobaltQuota / 1000f) + "K COBALT ORE");
-                }
-            }
-
-            // ICE
-            if (objectives[i].Contains("ICE") && console.iceHeld >= console.iceQuota)
-            {
-                objectives[i] = "ICE QUOTA MET!";
-                allObjectives = allObjectives.Replace("MINE " + Mathf.Round(console.iceQuota / 1000f) + "K ICE", "ICE QUOTA MET!");
-            }
-            else if (objectives[i].Contains("ICE") && console.iceHeld < console.iceQuota)
-            {
-                objectives[i] = "MINE " + Mathf.Round(console.iceQuota / 1000f) + "K ICE";
-                if (allObjectives.Contains("ICE QUOTA MET"))
-                {
-                    allObjectives = allObjectives.Replace("ICE QUOTA MET!", "MINE " + Mathf.Round(console.iceQuota / 1000f) + "K ICE");
-                }
-            }
-
-            // NICKEL
-            if (objectives[i].Contains("NICKEL") && console.nickelHeld >= console.nickelQuota)
-            {
-                objectives[i] = "NICKEL QUOTA MET!";
-                allObjectives = allObjectives.Replace("MINE " + Mathf.Round(console.nickelQuota / 1000f) + "K NICKEL ORE", "NICKEL QUOTA MET!");
-            }
-            else if (objectives[i].Contains("NICKEL") && console.nickelHeld < console.nickelQuota)
-            {
-                objectives[i] = "MINE " + Mathf.Round(console.nickelQuota / 1000f) + "K NICKEL ORE";
-                if (allObjectives.Contains("NICKEL QUOTA MET"))
-                {
-                    allObjectives = allObjectives.Replace("NICKEL QUOTA MET!", "MINE " + Mathf.Round(console.nickelQuota / 1000f) + "K NICKEL ORE");
-                }
-            }
-        }
+        volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
+        dialogSlider.onValueChanged.AddListener(OnDialogChanged);
+        sfxSlider.onValueChanged.AddListener(OnSFXChanged);
     }
 
     // Update is called once per frame
     void Update()
     {
-        audioMixer.SetFloat("Music", Mathf.Log10(volumeSlider.value) * 20);
-        audioMixer.SetFloat("Dialog", Mathf.Log10(dialogSlider.value) * 20);
-        audioMixer.SetFloat("Effects", Mathf.Log10(dialogSlider.value) * 20);
-
-        if (Input.GetKeyDown(KeyCode.Escape))
+        staggeredUpdateTimer += Time.deltaTime;
+        if(staggeredUpdateTimer >= staggeredUpdateInterval)
         {
-            isPaused = !isPaused;
-            pauseMenu.SetActive(isPaused);
-            settingsMenu.SetActive(isPaused);
-            if (isPaused)
-            {
-                alreadyDisabledCursor = false;
-                AudioListener.pause = true;
-                Time.timeScale = 0f;
-                Cursor.visible = true;
-                Cursor.lockState = CursorLockMode.None;
-            }
-            else
-            {
-                if (!alreadyDisabledCursor && mouseMode)
-                {
-                    Cursor.visible = false;
-                    alreadyDisabledCursor = true;
-                }
-                tipsMenu.SetActive(false);
-                AudioListener.pause = false;
-                Time.timeScale = 1f;
-            }
+            checkQuotaProgression(); //A lot of if conditions here, so let's not check it every frame.
+            staggeredUpdateTimer = 0f;
         }
 
-        objectiveTextbox.text = allObjectives;
-        if (Input.GetKey(KeyCode.Tab))
+        if (Input.GetKeyDown(KeyCode.Escape)) //Pause menu handling
         {
-            objectiveTextbox.gameObject.SetActive(true);
-            objectiveTextBoxAnimator.enabled = true;
-            objectiveTextBoxAnimator.SetBool("holdingTab", true);
-        }
-        else
-        {
-            objectiveTextBoxAnimator.SetBool("holdingTab", false);
-        }
-        // Build objective string every frame cuz efficiency is for nerds
-        string currentObjectives = "";
-
-        // Add mining quotas
-        if (console.ironQuota > 0)
-        {
-            if (console.ironHeld >= console.ironQuota)
-                currentObjectives += "IRON QUOTA MET!\n";
-            else
-                currentObjectives += "MINE " + Mathf.Round(console.ironQuota / 1000f) + "K IRON ORE\n";
-        }
-        if (console.cobaltQuota > 0)
-        {
-            if (console.cobaltHeld >= console.cobaltQuota)
-                currentObjectives += "COBALT QUOTA MET!\n";
-            else
-                currentObjectives += "MINE " + Mathf.Round(console.cobaltQuota / 1000f) + "K COBALT ORE\n";
-        }
-
-        if (console.iceQuota > 0)
-        {
-            if (console.iceHeld >= console.iceQuota)
-                currentObjectives += "ICE QUOTA MET!\n";
-            else
-                currentObjectives += "MINE " + Mathf.Round(console.iceQuota / 1000f) + "K ICE\n";
-        }
-
-        if (console.nickelQuota > 0)
-        {
-            if (console.nickelHeld >= console.nickelQuota)
-                currentObjectives += "NICKEL QUOTA MET!\n";
-            else
-                currentObjectives += "MINE " + Mathf.Round(console.nickelQuota / 1000f) + "K NICKEL ORE\n";
-        }
-
-        // Add other objectives
-        for (int i = 0; i < objectives.Count; i++)
-        {
-            currentObjectives += objectives[i] + "\n";
-        }
-
-        objectiveTextbox.text = currentObjectives;
-
-        if (console.beingAttacked)
-        {
-            if (!chaseMusic.isPlaying)
-            {
-                chaseMusic.volume = 0;
-                chaseMusic.Play();
-            }
-            if (chaseMusic.volume != 1)
-            {
-                chaseMusic.volume += Time.deltaTime;
-                if (chaseMusic.volume >= 1)
-                {
-                    chaseMusic.volume = 1;
-                }
-            }
-        }
-        else
-        {
-            if (chaseMusic.volume != 0)
-            {
-                chaseMusic.volume -= Time.deltaTime;
-                if (chaseMusic.volume <= 0)
-                {
-                    chaseMusic.volume = 0;
-                    chaseMusic.Stop();
-                }
-            }
+            pauseToggle();
         }
 
         //For pirate dialog
@@ -328,59 +156,109 @@ public class StoryManager : MonoBehaviour
             recentPirateAmbushQuip = false;
         }
 
-        //For the tutorial.
-        //if (Input.GetKeyDown(KeyCode.M) && !showedWarpTip)
-        //{
-        //    showedWarpTip = true;
-        //    StartCoroutine(playNextStep(tutorialMessages[1], true, "[LEFT BRACKET]\nTO CYCLE WAYPOINT!", false, "", KeyCode.LeftBracket, true));
-        //}
-        //if((showedWarpTip2 == false && showedWarpTip == true) && (Input.GetKeyDown(KeyCode.LeftBracket) || Input.GetKeyDown(KeyCode.RightBracket)))
-        //{
-        //    showedWarpTip2 = true;
-        //    StartCoroutine(playNextStep(tutorialMessages[0], true, "[Z]\nTO WARP!", false, "", KeyCode.Z, false));
-        //}
-        if(!showedBookTip && appForTutorial.activeSelf && !playingStoryMessage)
+        if(appForTutorial != null && !showedBookTip && appForTutorial.activeSelf && !playingStoryMessage)
         {
             showedBookTip = true;
             List<string> caps = new List<string>();
             List<float> times = new List<float>();
             
-            caps.Add("Okay. I got you a 24 hour subscription so you may familarize yourself with more of your ship's systems.");
+            caps.Add("Okay. I got you a 24 hour subscription so you may familarize yourself with more of your systems.");
             times.Add(0f);
-            caps.Add("We've placed an empty ship directly in front of you. Sometimes, wrecks like to broadcast data...");
-            times.Add(6f);
-            caps.Add("Remember. It is SUPER DUPER ILLEGAL to download unauthorized signals. This one is company approved.");
-            times.Add(12f);
-            caps.Add("Here are the instructions: MOVE FORWARDS UNTIL YOU SEE A TRACKING ICON.");
-            times.Add(20f);
+            caps.Add("I've placed an empty ship directly in front of you. Sometimes, they broadcast data...");
+            times.Add(6.6f);
+            caps.Add("Remember. It is very ILLEGAL to download unauthorized signals, but I've approved this one for you.");
+            times.Add(12.8f);
+            caps.Add("Here are your instructions: MOVE FORWARDS UNTIL YOU SEE A TRACKING ICON.");
+            times.Add(19f);
             caps.Add("CLICK ON THE ICON.");
             times.Add(24f);
-            caps.Add("OPEN THE MONITOR. OPEN THE DATA APP, AND THEN PRESS 'DOWNLOAD'.");
-            times.Add(27f);
+            caps.Add("OPEN YOUR MONITOR. OPEN THE DATA APP, AND THEN PRESS 'DOWNLOAD'.");
+            times.Add(26.8f);
 
-            StartCoroutine(playNextStep(tutorialMessages[2], true, "[SHIFT]\nTO MOVE FORWARD", false, "", KeyCode.LeftShift, true, caps, times, true));
+            StoryMessage message = new StoryMessage();
+            message.subtitles = caps;
+            message.timestamps = times;
+            message.audio = tutorialMessages[2];
+            message.showControlText = true;
+            message.controlText = "[SHIFT]\nTO MOVE FORWARD";
+            message.bind = KeyCode.LeftShift;
+            message.customInstruction = true;
+            message.freezePlayer = true;
+
+            EnqueueMessage(message);
+        }
+    }
+
+    void OnVolumeChanged(float value)
+    {
+        audioMixer.SetFloat("Music", Mathf.Log10(value) * 20);
+    }
+
+    void OnDialogChanged(float value)
+    {
+        audioMixer.SetFloat("Dialog", Mathf.Log10(value) * 20);
+    }
+
+    void OnSFXChanged(float value)
+    {
+        audioMixer.SetFloat("Effects", Mathf.Log10(value) * 20);
+    }
+
+    public void pauseToggle()
+    {
+        isPaused = !isPaused;
+        pauseMenu.SetActive(isPaused);
+        if (settingsMenu.activeSelf)
+        {
+            settingsMenu.SetActive(false);
+        }
+        if(confirmBackToMenu.activeSelf)
+        {
+            confirmBackToMenu.SetActive(false);
+        }
+        if(confirmExitApp.activeSelf)
+        {
+            confirmExitApp.SetActive(false);
+        }
+        if (isPaused)
+        {
+            AudioListener.pause = true;
+            Time.timeScale = 0f;
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
+        }
+        else
+        {
+            if (mouseMode.isOn)
+            {
+                Cursor.visible = false;
+            }
+            AudioListener.pause = false;
+            Time.timeScale = 1f;
         }
     }
 
     public void returnToMenu()
     {
+        Time.timeScale = 1f;
         SceneManager.LoadScene(0);
+    }
+
+    public void maybe()
+    {
+        if(Random.value >= 0.5f)
+        {
+            confirmBackToMenu.SetActive(false);
+        }
+        else
+        {
+            returnToMenu();
+        }
     }
 
     public void exitGame()
     {
         Application.Quit();
-    }
-
-    public void openSettingsMenu()
-    {
-        settingsMenu.SetActive(true);
-        pauseMenu.SetActive(false);
-    }
-    public void returnToPauseMenu()
-    {
-        settingsMenu.SetActive(false);
-        pauseMenu.SetActive(true);
     }
 
     public void changeRes()
@@ -402,37 +280,81 @@ public class StoryManager : MonoBehaviour
 
     public void setMouseMode()
     {
-        isMoused = mouseMode.isOn;
-        player.useMouseAim = isMoused;
-        console.usesMouseMode = isMoused;
+        player.useMouseAim = mouseMode.isOn;
+        console.usesMouseMode = mouseMode.isOn;
     }
 
     //A generic function to play an audio source, and show some text on the player's screen.
-    public IEnumerator playNextStep(AudioSource message, bool showControlText, string controlText, bool showObjectiveNotif, string objectiveText, KeyCode bindToPress, bool customInstruction, List<string> subtitles, List<float> timestamps, bool freezePlayer) //Timestamps should be like : 4.2 seconds
+    public void EnqueueMessage(StoryMessage message)
     {
-        while(playingStoryMessage) //WE RUN THIS LOOP TO ENSURE WE DONT OVERLAP WITH ALREADY PLAYING MESSAGES.
+        storyQueue.Enqueue(message);
+
+        if(!playingStoryMessage)
         {
-            yield return null;
+            StartCoroutine(queueProcessor());
         }
+    }
+
+    public IEnumerator queueProcessor() 
+    {
+        playingStoryMessage = true;
+
+        while(storyQueue.Count > 0)
+        {
+            StoryMessage message = storyQueue.Dequeue(); //Take the first thing in the queue...
+            yield return playNextStep(message); //Play that message, and don't restart the while loop until we're done.
+        }
+
+        playingStoryMessage = false;
+    }
+
+    public IEnumerator playNextStep(StoryMessage msg) //Timestamps should be like : 4.2 seconds
+    {
         captions.gameObject.SetActive(true);
         float timer = 0f;
+        float whiteoutTimer = 0f;
         int index = 0;
         playingStoryMessage = true;
-        player.canMove = !freezePlayer;
-        message.Play();
-        float soundLength = message.clip.length;
+        player.canMove = !msg.freezePlayer;
+        msg.audio.Play();
+        float soundLength = msg.audio.clip.length;
         bool finishedMessage = false;
-
-        captions.text = subtitles[0];
+        bool didWhiteout = false;
+        radioLight.SetActive(true);
+        captions.text = msg.subtitles[0];
+        if(msg.redactorSpawn)
+        {
+            console.warpJammed = true;
+            jammerSlider.maxValue = 150f;
+        }
         while (!finishedMessage) //While we're playing our message, keep the captions updated.
         {
             if (console.canWarp)
             {
-                player.canMove = !freezePlayer;
+                player.canMove = !msg.freezePlayer;
             }
-            captions.text = subtitles[index];
+            captions.text = msg.subtitles[index];
             timer += Time.deltaTime;
-            if (index < subtitles.Count - 1 && timer >= timestamps[index+1])
+            if(didWhiteout && whiteoutTimer < 3f && msg.whiteOut)
+            {
+                whiteoutTimer += Time.deltaTime;
+            }
+            else if(didWhiteout && whiteoutTimer >= 3f)
+            {
+                whiteout.SetActive(false);
+            }
+            if(timer >= msg.timeToWhiteOut && !didWhiteout && msg.whiteOut)
+            {
+                whiteout.SetActive(true);
+                didWhiteout = true;
+                if (msg.redactorSpawn)
+                {
+                    GameObject newRedactor = GameObject.Instantiate(Redactor, player.transform.position + (player.transform.forward * 1000f), Quaternion.identity, msg.homePoint);
+                    newRedactor.SetActive(true);
+                    newRedactor.GetComponent<RedactorPathfinder>().home = msg.homePoint;
+                }
+            }
+            if (index < msg.subtitles.Count - 1 && timer >= msg.timestamps[index+1])
             {
                 index += 1;
             }
@@ -440,21 +362,21 @@ public class StoryManager : MonoBehaviour
             {
                 finishedMessage = true;
             }
-            print("TIMER:" + timer+ "\nCLIP LENGTH: " + soundLength);
+
             yield return null;
         }
-        if(showControlText)
+        if(msg.showControlText)
         {
             controlTip.SetActive(true);
-            controlTipText.text = controlText;
+            controlTipText.text = msg.controlText;
         }
 
         Vector2 currentSize = controlTip.GetComponent<RectTransform>().sizeDelta;
-        if (customInstruction)
+        if (msg.customInstruction)
         {
             controlTip.GetComponent<RectTransform>().sizeDelta = new Vector2(currentSize.x*5f, currentSize.y);
         }
-        while(!Input.GetKeyDown(bindToPress) && showControlText) //If we're ought to show a keybind hint, don't leave before we get it.
+        while(!Input.GetKeyDown(msg.bind) && msg.showControlText) //If we're ought to show a keybind hint, don't leave before we get it.
         {
             yield return null;
         }
@@ -462,9 +384,187 @@ public class StoryManager : MonoBehaviour
         {
             player.canMove = true;
         }
-        controlTip.GetComponent<RectTransform>().sizeDelta = currentSize;
-        controlTip.SetActive(false);
+        if (msg.showControlText)
+        {
+            controlTip.GetComponent<RectTransform>().sizeDelta = currentSize;
+            controlTip.SetActive(false);
+        }
+        radioLight.SetActive(false);
         captions.gameObject.SetActive(false);
-        playingStoryMessage = false;
     }
+
+    void checkQuotaProgression()
+    {
+        if (console.day != 0)
+        {
+            if (console.ironQuota > 0 && console.ironHeld*2f >= console.ironQuota && quota1met == false)
+            {
+                quotasMet += 1;
+                quota1met = true;
+                if (quotasMet <= ads[console.day - 1].audioClips.Count)
+                {
+                    StoryMessage message = new StoryMessage();
+                    message.audio = ads[console.day - 1].audioClips[quotasMet-1];
+                    message.subtitles = ads[console.day - 1].captions[quotasMet - 1].captions;
+                    message.timestamps = ads[console.day - 1].timestamps[quotasMet - 1].timestamps;
+                    EnqueueMessage(message);
+                }
+            }
+            if (console.aluminumQuota > 0 && console.aluminumHeld >= console.aluminumQuota && quota2met == false)
+            {
+                quotasMet += 1;
+                quota2met = true;
+                if (quotasMet <= ads[console.day - 1].audioClips.Count)
+                {
+                    StoryMessage message = new StoryMessage();
+                    message.audio = ads[console.day - 1].audioClips[quotasMet - 1];
+                    message.subtitles = ads[console.day - 1].captions[quotasMet - 1].captions;
+                    message.timestamps = ads[console.day - 1].timestamps[quotasMet - 1].timestamps;
+                    EnqueueMessage(message);
+                }
+            }
+            if (console.carbonQuota > 0 && console.carbonHeld >= console.carbonQuota && quota3met == false)
+            {
+                quotasMet += 1;
+                quota3met = true;
+                if (quotasMet <= ads[console.day - 1].audioClips.Count)
+                {
+                    StoryMessage message = new StoryMessage();
+                    message.audio = ads[console.day - 1].audioClips[quotasMet - 1];
+                    message.subtitles = ads[console.day - 1].captions[quotasMet - 1].captions;
+                    message.timestamps = ads[console.day - 1].timestamps[quotasMet - 1].timestamps;
+                    EnqueueMessage(message);
+                }
+            }
+            if (console.clayQuota > 0 && console.clayHeld*2f >= console.clayQuota && quota4met == false)
+            {
+                quotasMet += 1;
+                quota4met = true;
+                if (quotasMet <= ads[console.day - 1].audioClips.Count)
+                {
+                    StoryMessage message = new StoryMessage();
+                    message.audio = ads[console.day - 1].audioClips[quotasMet - 1];
+                    message.subtitles = ads[console.day - 1].captions[quotasMet - 1].captions;
+                    message.timestamps = ads[console.day - 1].timestamps[quotasMet - 1].timestamps;
+                    EnqueueMessage(message);
+                }
+            }
+            if (console.cobaltQuota > 0 && console.cobaltHeld >= console.cobaltQuota && quota5met == false)
+            {
+                quotasMet += 1;
+                quota5met = true;
+                if (quotasMet <= ads[console.day - 1].audioClips.Count)
+                {
+                    StoryMessage message = new StoryMessage();
+                    message.audio = ads[console.day - 1].audioClips[quotasMet - 1];
+                    message.subtitles = ads[console.day - 1].captions[quotasMet - 1].captions;
+                    message.timestamps = ads[console.day - 1].timestamps[quotasMet - 1].timestamps;
+                    EnqueueMessage(message);
+                }
+            }
+            if (console.helium3Quota > 0 && console.helium3Held >= console.helium3Quota && quota6met == false)
+            {
+                quotasMet += 1;
+                quota6met = true;
+                if (quotasMet <= ads[console.day - 1].audioClips.Count)
+                {
+                    StoryMessage message = new StoryMessage();
+                    message.audio = ads[console.day - 1].audioClips[quotasMet - 1];
+                    message.subtitles = ads[console.day - 1].captions[quotasMet - 1].captions;
+                    message.timestamps = ads[console.day - 1].timestamps[quotasMet - 1].timestamps;
+                    EnqueueMessage(message);
+                }
+            }
+            if (console.hydrogenQuota > 0 && console.hydrogenHeld >= console.hydrogenQuota && quota7met == false)
+            {
+                quotasMet += 1;
+                quota7met = true;
+                if (quotasMet <= ads[console.day - 1].audioClips.Count)
+                {
+                    StoryMessage message = new StoryMessage();
+                    message.audio = ads[console.day - 1].audioClips[quotasMet - 1];
+                    message.subtitles = ads[console.day - 1].captions[quotasMet - 1].captions;
+                    message.timestamps = ads[console.day - 1].timestamps[quotasMet - 1].timestamps;
+                    EnqueueMessage(message);
+                }
+            }
+            if (console.iceQuota > 0 && console.iceHeld * 2f >= console.iceQuota && quota8met == false)
+            {
+                quotasMet += 1;
+                quota8met = true;
+                if (quotasMet <= ads[console.day - 1].audioClips.Count)
+                {
+                    StoryMessage message = new StoryMessage();
+                    message.audio = ads[console.day - 1].audioClips[quotasMet - 1];
+                    message.subtitles = ads[console.day - 1].captions[quotasMet - 1].captions;
+                    message.timestamps = ads[console.day - 1].timestamps[quotasMet - 1].timestamps;
+                    EnqueueMessage(message);
+                }
+            }
+            if (console.magnesiumQuota > 0 && console.magnesiumHeld >= console.magnesiumQuota && quota9met == false)
+            {
+                quotasMet += 1;
+                quota9met = true;
+                if (quotasMet <= ads[console.day - 1].audioClips.Count)
+                {
+                    StoryMessage message = new StoryMessage();
+                    message.audio = ads[console.day - 1].audioClips[quotasMet - 1];
+                    message.subtitles = ads[console.day - 1].captions[quotasMet - 1].captions;
+                    message.timestamps = ads[console.day - 1].timestamps[quotasMet - 1].timestamps;
+                    EnqueueMessage(message);
+                }
+            }
+            if (console.nickelQuota > 0 && console.nickelHeld >= console.nickelQuota && quota10met == false)
+            {
+                quotasMet += 1;
+                quota10met = true;
+                if (quotasMet <= ads[console.day - 1].audioClips.Count)
+                {
+                    StoryMessage message = new StoryMessage();
+                    message.audio = ads[console.day - 1].audioClips[quotasMet-1];
+                    message.subtitles = ads[console.day - 1].captions[quotasMet - 1].captions;
+                    message.timestamps = ads[console.day - 1].timestamps[quotasMet - 1].timestamps;
+                    EnqueueMessage(message);
+                }
+            }
+        }
+    }
+}
+
+[System.Serializable] //Yes I know my poor choice of naming has made this completely unreadable. I pray that I will never have to touch this again.
+public class StoryMessage
+{
+    public AudioSource audio;
+    public List<string> subtitles;
+    public List<float> timestamps;
+    public bool showControlText;
+    public bool customInstruction = false;
+    public string controlText;
+    public KeyCode bind;
+    public bool freezePlayer;
+
+    public bool whiteOut = false;
+    public float timeToWhiteOut = 0f;
+
+    public bool redactorSpawn = false;
+    public Transform homePoint;
+}
+
+[System.Serializable]
+public class AdSet
+{
+    public List<AudioSource> audioClips;
+    public List<Captions> captions;
+    public List<Timestamps> timestamps;
+}
+
+[System.Serializable]
+public class Captions
+{
+    public List<string> captions;
+}
+[System.Serializable]
+public class Timestamps
+{
+    public List<float> timestamps;
 }
