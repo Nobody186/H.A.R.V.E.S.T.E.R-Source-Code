@@ -5,6 +5,7 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 
 public class GunController : MonoBehaviour
 {
@@ -17,6 +18,7 @@ public class GunController : MonoBehaviour
     [SerializeField] Transform radarLookDir;
     [SerializeField] GameObject BASIC;
     [SerializeField] GameObject targetSymbol;
+    [SerializeField] GameObject symbolParticle;
     [SerializeField] TextMeshProUGUI hudName;
     [SerializeField] Animator RDRVisualizer;
     public GameObject Target;
@@ -26,17 +28,24 @@ public class GunController : MonoBehaviour
     //Lists
     [SerializeField] List<GameObject> positions;
     [SerializeField] List<GameObject> hudTrackers;
-    
+    [SerializeField] List<GameObject> hudParticles;
+    //Filters out what we aim and checks for this layer.
+    //if i knew i would need these many variables just for some cosmetic effects, i never would have started
+    //update from the future: This was 100% worth it.
     [SerializeField] GameObject lockHud;
+    [SerializeField] GameObject lockParticle;
     [SerializeField] GameObject decoyHud;
     [SerializeField] Transform spawn;
-    //This is just so we can physically point the gun.
+    [SerializeField] Transform particleSpawn;
+    //This is just so we can physically point the gun. The player can't see it but I already programmed it in and it took some effort getting it pointed right
+    //Update from the future: It became very useful later on. Because the player CAN see the laser.
     [SerializeField] Transform gun;
     [SerializeField] GameObject gunBase;
 
     [SerializeField] bool lockAttempted = false;
     GameObject recentScanPosition;
     GameObject recentTrack;
+    GameObject recentParticle;
     //The following are public only so that ConsoleController can access them.
     public float Distance = 0f;
     public float MinRange = 25f;
@@ -52,16 +61,19 @@ public class GunController : MonoBehaviour
     public Transform laserEnd;
     [SerializeField] Transform gunPos;
     [SerializeField] AudioSource laserSound;
+    [SerializeField] AudioSource radarLockSfx;
+    [SerializeField] AudioSource radarUnlockSfx;
     [SerializeField] ParticleSystem LaserParticle; //Optional.
     public bool isMining = false; //So we can check the current status of the laser
     public bool canMine = false; //Some general criteria thing
-    public bool safeAngle = true; //The player cant fire the laser at themselves unfortunately.
-    public bool Cool = false; //Cooldown boolean (deprecated)
+    public bool safeAngle = true;
+    public bool Cool = false; //Cooldown boolean
     public bool chargingLaser = false;
-    public float laserTimer = 0f; //Once we're done with the laser, keep track of how long we've been not using it (For a cooldown. This is deprecated.)
+    public float laserTimer = 0f; //Once we're done with the laser, keep track of how long we've been not using it
     public float laserOnTimer = 0f; // How long the laser has been on
 
     private float timer = 0f;
+    float LOS_Timer = 0f; //A timer to keep track of Line Of Sight.
     public bool palAttempted = false;
     bool missileRearm = false;
     private Animator radarAnimator;
@@ -79,44 +91,56 @@ public class GunController : MonoBehaviour
     [SerializeField] GameObject PopUp;
     [SerializeField] TextMeshProUGUI PopUpText;
     [SerializeField] TextMeshPro oreCollectedText;
-    //Tutorial stuff
+
     [SerializeField] StoryManager storyManager;
     bool playedTutLine1 = false;
     bool playedTutLine2 = false;
-    bool playedTutLine0 = false;
+
     [SerializeField] AudioSource tutLine0;
     [SerializeField] AudioSource tutLine1;
     [SerializeField] AudioSource tutLine2;
 
     [SerializeField] Transform raycaster;
     [SerializeField] ParticleSystem debrisCloud;
+    [SerializeField] GameObject laserExplosion;
 
     LayerMask mask;
+
+    // Staggered update variables
+    private int currentUpdateIndex = 0;
+    private float staggeredUpdateTimer = 0f;
+    private const float staggeredUpdateInterval = 0.05f; // Update every 0.05 seconds
+    private int updatesPerFrame = 2; // Number of items to update per staggered update
 
     private void Start()
     {
         LaserParticle.Stop();
         debrisCloud.Stop();
+        laserExplosion.SetActive(false);
         radarAnimator = RDRVisualizer.GetComponent<Animator>();
-        if(console.usingMissileUpgrade)
+        if (console.usingMissileUpgrade)
         {
             missileTimer.text = "READY";
         }
-        else if(console.usingdampDisablerUpgrade)
+        else if (console.usingdampDisablerUpgrade)
         {
             missileTimer.text = "DAMP ON";
         }
-        else if(console.usingDashUpgrade)
+        else if (console.usingDashUpgrade)
         {
             missileTimer.text = "DASH";
         }
-        else if(console.usingCamoUpgrade)
+        else if (console.usingCamoUpgrade)
         {
             missileTimer.text = "VISIBLE";
         }
         else if (console.usingRadar3Upgrade)
         {
             missileTimer.text = "HILITE OFF";
+        }
+        else if (console.usingPalUpgrade)
+        {
+            missileTimer.text = "RDR2 ON";
         }
 
         mask = LayerMask.GetMask("Mineable", "Enemy");
@@ -158,6 +182,11 @@ public class GunController : MonoBehaviour
                     return;
                 }
             }
+            //If it isn't a physics object, don't register it.
+            if (rdr.GetComponent<Rigidbody>() == null)
+            {
+                return;
+            }
             //Register position with its velocity.
             recentScanPosition = Instantiate(BASIC.gameObject, rdr.transform.position, Quaternion.identity);
             recentScanPosition.GetComponent<Rigidbody>().linearVelocity = rdr.GetComponent<Rigidbody>().linearVelocity;
@@ -165,6 +194,9 @@ public class GunController : MonoBehaviour
             //Create tracker.
             recentTrack = Instantiate(targetSymbol.gameObject, cam.WorldToScreenPoint(recentScanPosition.transform.position), Quaternion.identity, spawn);
             hudTrackers.Add(recentTrack);
+            //Create particle
+            recentParticle = Instantiate(symbolParticle, cam.ScreenToWorldPoint(recentTrack.transform.position), Quaternion.Euler(0, 0, 0), particleSpawn);
+            hudParticles.Add(recentParticle);
         }
         else if (hasBasic && !hasAsteroid) //If we have a basic, but no object.
         {
@@ -174,8 +206,10 @@ public class GunController : MonoBehaviour
                 {
                     Destroy(positions[i].gameObject);
                     Destroy(hudTrackers[i].gameObject);
+                    Destroy(hudParticles[i].gameObject);
                     positions.Remove(positions[i]);
                     hudTrackers.Remove(hudTrackers[i]);
+                    hudParticles.Remove(hudParticles[i]);
                 }
             }
         }
@@ -192,8 +226,8 @@ public class GunController : MonoBehaviour
             RDRVisualizer.SetBool("LockSuccessful", true);
             decoyHud.SetActive(true);
             decoyHud.transform.position = cam.WorldToScreenPoint(Target.transform.position);
-            print("TARGET: " + Target.name);
-            if(Target.name.Contains("Asteroid") && Target.GetComponent<Mineable>() == null)
+            //print("TARGET: " + Target.name);
+            if (Target.name.Contains("Asteroid") && Target.GetComponent<Mineable>() == null)
             {
                 Mineable targetRef = Target.AddComponent<Mineable>();
                 targetRef.gun = this;
@@ -208,7 +242,7 @@ public class GunController : MonoBehaviour
                 targetRef.PopUp = PopUp;
                 targetRef.PopUpText = PopUpText;
                 targetRef.oreCollectedText = oreCollectedText;
-                if(Target.name.Contains("big"))
+                if (Target.name.Contains("big"))
                 {
                     targetRef.explosion = bigExplosion;
                 }
@@ -219,6 +253,7 @@ public class GunController : MonoBehaviour
             }
             lockAttempted = false;
             palAttempted = false;
+            radarLockSfx.Play();
             return;
         }
     }
@@ -228,10 +263,12 @@ public class GunController : MonoBehaviour
     void Update()
     {
         checkForLockFailure();
-        if(Input.GetKeyDown(KeyCode.X)) {
+        if (Input.GetKeyDown(KeyCode.X))
+        {
             unLock();
         }
-        if(Input.GetKeyDown(KeyCode.E) && !console.navMode && console.usingPalUpgrade) {
+        if (Input.GetKeyDown(KeyCode.E) && !console.navMode && console.usingPalUpgrade)
+        {
             if (!palAttempted)
             {
                 timer = 0;
@@ -241,7 +278,7 @@ public class GunController : MonoBehaviour
                 palAttempted = true;
                 lockAttempted = true;
             }
-            else if(palAttempted && Target == null)
+            else if (palAttempted && Target == null)
             {
                 palAttempted = false;
                 lockAttempted = false;
@@ -266,7 +303,7 @@ public class GunController : MonoBehaviour
         {
             missileTimer.text = "HILITE ON";
         }
-        else if(console.usingRadar3Upgrade && !console.isSeeing)
+        else if (console.usingRadar3Upgrade && !console.isSeeing)
         {
             missileTimer.text = "HILITE OFF";
         }
@@ -282,29 +319,32 @@ public class GunController : MonoBehaviour
         {
             missileTimer.text = "DAMP OFF";
         }
-        else if(!Input.GetButton("Jump") && console.usingdampDisablerUpgrade)
+        else if (!Input.GetButton("Jump") && console.usingdampDisablerUpgrade)
         {
             missileTimer.text = "DAMP ON";
         }
         if (Target != null)
         {
-            if(console.day == 0)
+            if (console.day == 0)
             {
                 if (!playedTutLine1 && Target.name.Contains("Asteroid"))
                 {
                     List<string> caps = new List<string>();
                     List<float> times = new List<float>();
-                    times.Add(0);
-                    caps.Add("And what exactly are you smiling for?");
-                    times.Add(4);
-                    caps.Add("THERE'S NOTHING TO SMILE ABOUT IN THIS LIFE!");
-                    times.Add(7);
-                    caps.Add("Get back to work!");
-                    times.Add(9);
-                    caps.Add("Find any asteroid. Preferably a big one. And analyze it using the SCAN app.");
-                    times.Add(14);
-                    caps.Add("Mine until you've met your quota of iron. You can check your quotas in the STATION (STN) app.");
-                    StartCoroutine(storyManager.playNextStep(tutLine1, false, "[ENTER]\nTO ANALYZE ORE", false, "", KeyCode.None, true, caps, times));
+                    caps.Add("Remember! Set your laser intensity to 55%, and DO NOT let the PTI get lower than 15%!");
+                    times.Add(0f);
+
+                    StoryMessage message = new StoryMessage();
+                    message.subtitles = caps;
+                    message.timestamps = times;
+                    message.audio = tutLine1;
+                    message.showControlText = false;
+                    message.controlText = "";
+                    message.bind = KeyCode.None;
+                    message.customInstruction = false;
+                    message.freezePlayer = false;
+
+                    storyManager.EnqueueMessage(message);
                     playedTutLine1 = true;
                 }
                 //if(!playedTutLine0)
@@ -314,7 +354,7 @@ public class GunController : MonoBehaviour
                 //}
             }
             LaserParticle.transform.LookAt(Target.transform);
-            print("LOCK SUCCESSFUL!");
+            //print("LOCK SUCCESSFUL!");
             Distance = Vector3.Distance(gun.position, Target.transform.position);
             decoyHud.SetActive(false);
 
@@ -322,10 +362,12 @@ public class GunController : MonoBehaviour
             {
                 for (int i = 0; i < positions.Count; i++)
                 {
-                    Destroy(hudTrackers[i].gameObject);
                     Destroy(positions[i].gameObject);
+                    Destroy(hudTrackers[i].gameObject);
+                    Destroy(hudParticles[i].gameObject);
                     positions.Remove(positions[i]);
                     hudTrackers.Remove(hudTrackers[i]);
+                    hudParticles.Remove(hudParticles[i]);
                 }
             }
 
@@ -352,34 +394,43 @@ public class GunController : MonoBehaviour
                     RaycastHit hit;
                     if (Physics.SphereCast(raycaster.position, 0.1f, raycaster.forward, out hit, Mathf.Infinity, mask))
                     {
-                        print("HIT: " + hit.transform.name);
+                        //print("HIT: " + hit.transform.name);
                         if (!Target.name.Contains("small") && hit.transform == Target.transform)
                         {
                             debrisCloud.gameObject.transform.position = hit.point;
-                            debrisCloud.gameObject.transform.rotation = Quaternion.LookRotation(hit.normal);
+                            laserExplosion.gameObject.transform.position = hit.point;
+                            laserExplosion.SetActive(true);
+                            debrisCloud.gameObject.transform.rotation = Quaternion.LookRotation(-(Target.transform.position - gun.transform.position)).normalized;
                             debrisCloud.Play();
                         }
                         else
                         {
+                            laserExplosion.SetActive(false);
                             debrisCloud.Stop();
                         }
+
+                        float gracePeriod = 1f;
+                        if (hit.transform != Target.transform)
+                        {
+                            LOS_Timer += Time.deltaTime;
+                            if (LOS_Timer >= gracePeriod)
+                            {
+                                LOS_Timer = 0f;
+                                unLock();
+                            }
+                        }
+                        else
+                        {
+                            LOS_Timer = 0f;
+                        }
                     }
-                    if(console.day == 0 && !playedTutLine2)
+                    if (console.day == 0 && !playedTutLine2)
                     {
                         playedTutLine2 = true;
                         //StartCoroutine(storyManager.playNextStep(tutLine2, false, "", false, "", KeyCode.None, false));
                     }
                     chargingLaser = false;
-                    //float maxLength = (Vector3.Distance(gunPos.position, Target.transform.position)) * 1.1f;
-                    //Laser.transform.rotation = Quaternion.Slerp(Laser.transform.rotation, gunlookRotation, Time.deltaTime * 5f);
-                    //if (Laser.transform.localScale.z < maxLength && laserOnTimer < 2f)
-                    //{
-                       // Laser.transform.localScale = new Vector3(Laser.transform.localScale.x, Laser.transform.localScale.y, Laser.transform.localScale.z * 1.4f * (Time.deltaTime + 1));
-                    //}
-                    //else if (laserOnTimer > 2f)
-                    //{
-                        //Laser.transform.localScale = new Vector3(Laser.transform.localScale.x, Laser.transform.localScale.y, maxLength);
-                    //}
+
                     if (!LaserParticle.isPlaying)
                     {
                         LaserParticle.Play();
@@ -415,7 +466,9 @@ public class GunController : MonoBehaviour
             }
             if (!isMining) //Shrink the laser, and play the stop mining animation (This plays every frame when we stop mining)
             {
+                laserOnTimer = 0f;
                 gunBase.GetComponent<Animator>().SetBool("isMining", false);
+                laserExplosion.SetActive(false);
                 debrisCloud.Stop();
                 LaserParticle.Stop();
                 Laser.transform.localScale = new Vector3(Laser.transform.localScale.x, Laser.transform.localScale.y, 0.15f);
@@ -426,6 +479,7 @@ public class GunController : MonoBehaviour
 
         //All of this plays if we do NOT have a target
         isMining = false;
+        laserExplosion.SetActive(false);
         debrisCloud.Stop();
         LaserParticle.Stop();
         safeAngle = true;
@@ -433,18 +487,70 @@ public class GunController : MonoBehaviour
         gunBase.GetComponent<Animator>().SetBool("isMining", false);
         Laser.transform.localScale = new Vector3(Laser.transform.localScale.x, Laser.transform.localScale.y, 0.15f);
         lockHud.SetActive(false);
+        lockParticle.SetActive(false);
 
+        // Update all positions and rotations every frame
         for (int i = 0; i < hudTrackers.Count; i++)
         {
-            hudTrackers[i].transform.position = cam.WorldToScreenPoint(positions[i].transform.position);
-            //if it is reasonable to show a lock symbol, then show it
-            if (positions[i].GetComponent<Renderer>().isVisible == true && Vector3.Distance(positions[i].gameObject.transform.position, transform.position) <= MaxRange)
+            Vector3 screenPos = cam.WorldToScreenPoint(positions[i].transform.position);
+            hudTrackers[i].transform.position = screenPos;
+
+            //Keep our particles aligned with the trackers.
+            Vector3 hudTrackerPos = hudTrackers[i].transform.position;
+            hudTrackerPos.z = 10f;
+            hudParticles[i].transform.position = cam.ScreenToWorldPoint(hudTrackerPos);
+
+            //Keep particles facing the player
+            Quaternion particleLookDir = Quaternion.LookRotation(positions[i].transform.position - cam.transform.position).normalized;
+            hudParticles[i].transform.rotation = particleLookDir;
+        }
+
+        // Staggered update for color and visibility
+        staggeredUpdateTimer += Time.deltaTime;
+        if (staggeredUpdateTimer >= staggeredUpdateInterval)
+        {
+            staggeredUpdateTimer = 0f;
+
+            for (int updateCount = 0; updateCount < updatesPerFrame && hudTrackers.Count > 0; updateCount++)
             {
-                hudTrackers[i].SetActive(true);
-            }
-            else
-            {
-                hudTrackers[i].SetActive(false);
+                if (currentUpdateIndex >= hudTrackers.Count)
+                {
+                    currentUpdateIndex = 0;
+                }
+
+                int i = currentUpdateIndex;
+
+                //Color handling
+                Button button = hudTrackers[i].GetComponent<Button>();
+                ColorBlock colors = button.colors;
+                Color buttonColor;
+
+                if (button.gameObject.GetComponent<buttonHiLiteCheck>().isMouseOver)
+                {
+                    buttonColor = colors.highlightedColor;
+                }
+                else
+                {
+                    buttonColor = colors.normalColor;
+                }
+
+                MaterialPropertyBlock mpb = new MaterialPropertyBlock();
+                mpb.SetColor("_EmissiveColor", buttonColor);
+                hudParticles[i].GetComponent<ParticleSystemRenderer>().SetPropertyBlock(mpb);
+
+                //if it is reasonable to show a lock symbol, then show it
+                if (positions[i].GetComponent<Renderer>().isVisible == true && Vector3.Distance(positions[i].gameObject.transform.position, transform.position) <= MaxRange)
+                {
+                    hudTrackers[i].SetActive(true);
+                    hudParticles[i].SetActive(true);
+                }
+                else
+                {
+                    hudTrackers[i].SetActive(false);
+                    hudParticles[i].SetActive(false);
+                }
+
+                currentUpdateIndex++;
             }
         }
     }
@@ -453,18 +559,27 @@ public class GunController : MonoBehaviour
     {
         timer = 0;
         Vector3 mousePos = clickedButton.transform.position;
+
+        for (int i = 0; i < positions.Count; i++)
+        {
+            if (hudTrackers[i] == clickedButton)
+            {
+                mousePos.z = positions[i].transform.position.z;
+            }
+        }
+
         RDRVisualizer.SetBool("PAL", false);
         RDRVisualizer.SetBool("Searching", false);
         RDRVisualizer.SetBool("LockAttempted", true);
         Radar.transform.LookAt(cam.ScreenToWorldPoint(mousePos), Vector3.up);
         decoyHud.transform.position = mousePos;
         lockAttempted = true;
-        print("LOCK ATTEMPTED");
+        //print("LOCK ATTEMPTED");
     }
 
     public void unLock()
     {
-        if (!isMining)
+        if (!isMining || (isMining && chargingLaser))
         {
             Target = null;
             RDRVisualizer.SetBool("LockSuccessful", false);
@@ -474,28 +589,32 @@ public class GunController : MonoBehaviour
             Radar.transform.LookAt(radarLook);
             lockAttempted = false;
             lockHud.SetActive(false);
+            lockParticle.SetActive(false);
+            radarUnlockSfx.Play();
+            laserOnTimer = 0f;
+            chargingLaser = false;
         }
     }
 
 
     void checkTimer()
     {
-            if (Cool == true)
-            {
-                laserTimer += Time.deltaTime;
-            }
+        if (Cool == true)
+        {
+            laserTimer += Time.deltaTime;
+        }
 
-            if (laserTimer >= 2f)
-            {
-                Cool = false;
-                laserTimer = 0f;
-            }
+        if (laserTimer >= 2f)
+        {
+            Cool = false;
+            laserTimer = 0f;
+        }
     }
 
     void miningChecklist()
     {
         checkTimer();
-        if(Cool  == false && !isMining)
+        if (Cool == false && !isMining)
         {
             safeAngle = true;
         }
@@ -513,22 +632,60 @@ public class GunController : MonoBehaviour
     {
         for (int i = 0; i < positions.Count; i++)
         {
-            Destroy(hudTrackers[i].gameObject);
             Destroy(positions[i].gameObject);
+            Destroy(hudTrackers[i].gameObject);
+            Destroy(hudParticles[i].gameObject);
             positions.Remove(positions[i]);
             hudTrackers.Remove(hudTrackers[i]);
+            hudParticles.Remove(hudParticles[i]);
         }
 
         Radar.transform.LookAt(Target.transform.position);
         lockHud.SetActive(true);
-        lockHud.transform.position = cam.WorldToScreenPoint(Target.transform.position);
+        lockParticle.SetActive(true);
+
+        // Update lock HUD position and rotation every frame (continuous)
+        Vector3 screenPos = cam.WorldToScreenPoint(Target.transform.position);
+        lockHud.transform.position = screenPos;
+
+        //Keep our particles aligned with the trackers.
+        Vector3 hudTrackerPos = lockHud.transform.position;
+        hudTrackerPos.z = 10f;
+        lockParticle.transform.position = cam.ScreenToWorldPoint(hudTrackerPos);
+
+        //Keep particles facing the player
+        Quaternion particleLookDir = Quaternion.LookRotation(Target.transform.position - cam.transform.position).normalized;
+        lockParticle.transform.rotation = particleLookDir;
+
+        // Color handling (staggered update)
+        staggeredUpdateTimer += Time.deltaTime;
+        if (staggeredUpdateTimer >= staggeredUpdateInterval)
+        {
+            Button button = lockHud.GetComponent<Button>();
+            ColorBlock colors = button.colors;
+            Color buttonColor;
+
+            if (button.gameObject.GetComponent<buttonHiLiteCheck>().isMouseOver)
+            {
+                buttonColor = colors.highlightedColor;
+            }
+            else
+            {
+                buttonColor = colors.normalColor;
+            }
+
+            MaterialPropertyBlock mpb = new MaterialPropertyBlock();
+            mpb.SetColor("_EmissiveColor", buttonColor);
+            lockParticle.GetComponent<ParticleSystemRenderer>().SetPropertyBlock(mpb);
+        }
+
         if (!Target.gameObject.name.Contains("Enemy"))
         {
             if (Target.GetComponent<Renderer>().isVisible == true && Vector3.Distance(Target.gameObject.transform.position, transform.position) <= MaxRange)
             {
                 lockHud.SetActive(true);
             }
-            else if(Vector3.Distance(Target.gameObject.transform.position, transform.position) > MaxRange)
+            else if (Vector3.Distance(Target.gameObject.transform.position, transform.position) > MaxRange)
             {
                 isMining = false; //stop mining
                 chargingLaser = false;
@@ -547,9 +704,9 @@ public class GunController : MonoBehaviour
                     hasTarget = true;
                 }
             }
-            if(!hasTarget)
+            if (!hasTarget)
             {
-                print("COULDNT FIND TARGET!");
+                //print("COULDNT FIND TARGET!");
                 isMining = false; //stop mining
                 chargingLaser = false;
                 Cool = false; //Turn on our cooldown
@@ -566,7 +723,7 @@ public class GunController : MonoBehaviour
 
             if (Target == null && lockAttempted == true && timer > 1f)
             {
-                print("LOCK FAILURE!");
+                //print("LOCK FAILURE!");
                 RDRVisualizer.SetBool("LockAttempted", false);
                 RDRVisualizer.SetBool("Searching", true);
                 lockAttempted = false;
@@ -582,7 +739,7 @@ public class GunController : MonoBehaviour
         missileTimer.text = "REARMING...";
         GameObject spawnedMissile = Instantiate(missile, pylon.position, Quaternion.identity);
         spawnedMissile.SetActive(true);
-        yield return new WaitForSeconds(missileCooldown - (console.missileRearmLvl*0.5f));
+        yield return new WaitForSeconds(missileCooldown - (console.missileRearmLvl * 0.5f));
         missileRearm = false;
         missileTimer.text = "READY";
     }
@@ -600,4 +757,3 @@ public class GunController : MonoBehaviour
         }
     }
 }
-
