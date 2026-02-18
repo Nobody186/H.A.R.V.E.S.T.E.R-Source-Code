@@ -30,6 +30,7 @@ public class Mineable : MonoBehaviour
     public float asteroidHealthToShare;
     public float maxHealth = 500f;
     private bool laserTouching = false;
+    public bool enemyLaserHitting = false;
     float totalBlend;
     public bool isDestroyed = false;
 
@@ -58,17 +59,18 @@ public class Mineable : MonoBehaviour
     int oreType;
 
     public float totalValue;
-    float laseredValue;
     private float totalStuffAmount;
     private string compositionText;
-    bool isToxic;
 
     float ogMeltSpeed;
-    private float mineFractionPerTick;
+
+    Transform player;
+    float distance = 0f;
 
     private void Start()
     {
         mainCam = Camera.main;
+        player = mainCam.transform;
         asteroidRenderer = gameObject.GetComponent<Renderer>();
         Player = GameObject.Find("PlayerShip").transform;
         asteroidMat = gameObject.GetComponent<Renderer>().material;
@@ -148,25 +150,38 @@ public class Mineable : MonoBehaviour
 
         int baseSelector = Random.Range(0, 3); //Each ore type has either one kind of base, or both of them.
 
+        int oreCount = 0; //Track how many ores we've added
+
         switch (oreType)
         {
-            case 0: //METTALIC
-                if(baseSelector == 0)
+            case 0: //METALLIC
+                if (baseSelector == 0)
                 {
                     ironAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                    oreCount++;
                 }
-                else if(baseSelector == 1)
+                else if (baseSelector == 1)
                 {
                     aluminumAmount = Random.Range(300f, 520f) * maxHealth / 10;
+                    oreCount++;
                 }
                 else
                 {
                     ironAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
                     magnesiumAmount = Random.Range(300f, 520f) * maxHealth / 10;
+                    oreCount += 2;
                 }
 
-                if (Random.value < 0.40f) nickelAmount = Random.Range(40f, 160f) * maxHealth / 10;
-                if (Random.value <= 0.01f) platiniumAmount = Random.Range(0.5f, 3f) * maxHealth / 10;
+                if (oreCount < 5 && Random.value < 0.40f)
+                {
+                    nickelAmount = Random.Range(40f, 160f) * maxHealth / 10;
+                    oreCount++;
+                }
+                if (oreCount < 5 && Random.value <= 0.01f)
+                {
+                    platiniumAmount = Random.Range(0.5f, 3f) * maxHealth / 10;
+                    oreCount++;
+                }
 
                 break;
 
@@ -174,40 +189,62 @@ public class Mineable : MonoBehaviour
                 if (baseSelector == 0)
                 {
                     clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                    oreCount++;
                 }
                 else if (baseSelector == 1)
                 {
                     magnesiumAmount = Random.Range(250f, 400f) * maxHealth / 10;
+                    oreCount++;
                 }
                 else
                 {
                     clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
                     magnesiumAmount = Random.Range(250f, 400f) * maxHealth / 10;
+                    oreCount += 2;
                 }
 
-                if (Random.value < 0.35f) cobaltAmount = Random.Range(32f, 150f) * maxHealth / 10; //Yes, I know cobalt isn't soft. But I can't just put all the valuable stuff in the "metallic" ore.
-                if (Random.value <= 0.025f) diamondAmount = Random.Range(0.8f, 7f) * maxHealth / 10;
+                if (oreCount < 5 && Random.value < 0.35f)
+                {
+                    cobaltAmount = Random.Range(32f, 150f) * maxHealth / 10;
+                    oreCount++;
+                }
+                if (oreCount < 5 && Random.value <= 0.025f)
+                {
+                    diamondAmount = Random.Range(0.8f, 7f) * maxHealth / 10;
+                    oreCount++;
+                }
 
                 break;
 
             case 2: //GAS
-                isToxic = true;
+                //isToxic = true;
                 if (baseSelector == 0)
                 {
                     iceAmount = Random.Range(95f, 400f) * maxHealth / 10;
+                    oreCount++;
                 }
                 else if (baseSelector == 1)
                 {
                     hydrogenAmount = Random.Range(100f, 280f) * maxHealth / 10;
+                    oreCount++;
                 }
                 else
                 {
                     iceAmount = Random.Range(95f, 400f) * maxHealth / 10;
                     hydrogenAmount = Random.Range(100f, 280f) * maxHealth / 10;
+                    oreCount += 2;
                 }
 
-                if (Random.value < 0.15f) helium3Amount = Random.Range(1f, 5f) * maxHealth / 10;
-                if (Random.value <= 0.005f) plutoniumAmount = Random.Range(0.5f, 2f) * maxHealth / 10;
+                if (oreCount < 5 && Random.value < 0.15f)
+                {
+                    helium3Amount = Random.Range(1f, 5f) * maxHealth / 10;
+                    oreCount++;
+                }
+                if (oreCount < 5 && Random.value <= 0.005f)
+                {
+                    plutoniumAmount = Random.Range(0.5f, 2f) * maxHealth / 10;
+                    oreCount++;
+                }
 
                 break;
 
@@ -215,19 +252,30 @@ public class Mineable : MonoBehaviour
                 if (baseSelector == 0)
                 {
                     carbonAmount = Random.Range(95f, 200f) * maxHealth / 10;
+                    oreCount++;
                 }
                 else if (baseSelector == 1)
                 {
                     clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                    oreCount++;
                 }
                 else
                 {
                     carbonAmount = Random.Range(95f, 200f) * maxHealth / 10;
                     clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                    oreCount += 2;
                 }
 
-                if (Random.value < 0.15f) hydrogenAmount = Random.Range(100f, 280f) * maxHealth / 10;
-                if (Random.value < 0.025f) diamondAmount = Random.Range(0.8f, 7f) * maxHealth / 10;
+                if (oreCount < 5 && Random.value < 0.15f)
+                {
+                    hydrogenAmount = Random.Range(100f, 280f) * maxHealth / 10;
+                    oreCount++;
+                }
+                if (oreCount < 5 && Random.value < 0.025f)
+                {
+                    diamondAmount = Random.Range(0.8f, 7f) * maxHealth / 10;
+                    oreCount++;
+                }
 
                 break;
 
@@ -235,30 +283,65 @@ public class Mineable : MonoBehaviour
                 if (baseSelector == 0)
                 {
                     ironAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                    oreCount++;
                 }
                 else if (baseSelector == 1)
                 {
                     clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                    oreCount++;
                 }
                 else
                 {
                     ironAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
                     clayAmount = Random.Range(1000f, 1500f) * maxHealth / 10;
+                    oreCount += 2;
                 }
 
                 //Additional Stuff that wouldn't hurt.
-                if (Random.value < 0.4f) magnesiumAmount = Random.Range(300f, 520f) * maxHealth / 10;
-                if (Random.value < 0.4f) aluminumAmount = Random.Range(250f, 400f) * maxHealth / 10;
-                if (Random.value < 0.3f) iceAmount = Random.Range(95f, 400f) * maxHealth / 10;
-                if (Random.value < 0.3f) hydrogenAmount = Random.Range(100f, 280f) * maxHealth / 10;
-                if (Random.value < 0.4f) carbonAmount = Random.Range(95f, 200f) * maxHealth / 10;
+                if (oreCount < 5 && Random.value < 0.4f)
+                {
+                    magnesiumAmount = Random.Range(300f, 520f) * maxHealth / 10;
+                    oreCount++;
+                }
+                if (oreCount < 5 && Random.value < 0.4f)
+                {
+                    aluminumAmount = Random.Range(250f, 400f) * maxHealth / 10;
+                    oreCount++;
+                }
+                if (oreCount < 5 && Random.value < 0.3f)
+                {
+                    iceAmount = Random.Range(95f, 400f) * maxHealth / 10;
+                    oreCount++;
+                }
+                if (oreCount < 5 && Random.value < 0.3f)
+                {
+                    hydrogenAmount = Random.Range(100f, 280f) * maxHealth / 10;
+                    oreCount++;
+                }
+                if (oreCount < 5 && Random.value < 0.4f)
+                {
+                    carbonAmount = Random.Range(95f, 200f) * maxHealth / 10;
+                    oreCount++;
+                }
 
-                // Rarer, mid-Tier stuff
-                if (Random.value < 0.25f) nickelAmount = Random.Range(40f, 160f) * maxHealth / 10;
-                if (Random.value < 0.15f) cobaltAmount = Random.Range(32f, 150f) * maxHealth / 10;
-                if (Random.value < 0.05f) helium3Amount = Random.Range(1f, 5f) * maxHealth / 10;
+                //Rarer, mid-Tier stuff
+                if (oreCount < 5 && Random.value < 0.25f)
+                {
+                    nickelAmount = Random.Range(40f, 160f) * maxHealth / 10;
+                    oreCount++;
+                }
+                if (oreCount < 5 && Random.value < 0.15f)
+                {
+                    cobaltAmount = Random.Range(32f, 150f) * maxHealth / 10;
+                    oreCount++;
+                }
+                if (oreCount < 5 && Random.value < 0.05f)
+                {
+                    helium3Amount = Random.Range(1f, 5f) * maxHealth / 10;
+                    oreCount++;
+                }
 
-                break; 
+                break;
         }
 
 
@@ -352,7 +435,7 @@ public class Mineable : MonoBehaviour
         {
             compositionText += "PLUTONIUM: " + (plutoniumAmount / totalStuffAmount * 100f).ToString("F1") + "%\n";
         }
-        compositionText += "\nPREDICTED OVERALL VALUE: $" + Mathf.Round(totalValue);
+        compositionText += "PREDICTED VALUE: $" + Mathf.Round(totalValue);
         deathPercent = Random.Range(0, 15f);
         asteroidHealthToShare = Mathf.Round(health / maxHealth) * 100;
         ogMeltSpeed = meltSpeed;
@@ -504,6 +587,7 @@ public class Mineable : MonoBehaviour
 
     private void Update()
     {
+        distance = Vector3.Distance(transform.position, player.position);
         // Fixed tick rate calculation - higher laser intensity = faster mining
         float laserEfficiency = Mathf.Max(1f, gun.laserIntensity / 10f); // Prevent division by very small numbers
         tickRate = maxTickRate / laserEfficiency;
@@ -601,35 +685,37 @@ public class Mineable : MonoBehaviour
             asteroidMat.SetFloat("_BlendFactor", 0f);
         }
 
-        if (laserTouching)
+        if (laserTouching || enemyLaserHitting)
         {
             PopUp.GetComponent<Animator>().SetBool("shouldShow", false);
-            if (health < maxHealth && gameObject == gun.Target && asteroidMat.HasFloat("_BlendFactor"))
+            if (health < maxHealth && (gameObject == gun.Target || enemyLaserHitting) && asteroidMat.HasFloat("_BlendFactor"))
             {
                 totalBlend += meltSpeed * Time.deltaTime;
                 totalBlend = Mathf.Clamp01((float)totalBlend);
                 asteroidMat.SetFloat("_BlendFactor", totalBlend);
             }
             timer1 += Time.deltaTime;
-            if (timer1 >= tickRate && gun.Target == gameObject) //This makes sure that we only add to our balance once. Otherwise we get an extra reward for every other asteroid in the scene.
+            if (timer1 >= tickRate && (gun.Target == gameObject || enemyLaserHitting)) //This makes sure that we only add to our balance once. Otherwise we get an extra reward for every other asteroid in the scene.
             {
-                //GameObject temp = Instantiate(resourceCollectedImage.gameObject, canvas);
-                //GameObject temp2 = Instantiate(harvestedText.gameObject, hudPos);
-                //temp.SetActive(true);
-                //temp2.SetActive(true);
-                //Destroy(temp, 2f);
-                //Destroy(temp2, 1.7f);
-                AddOre(gun.laserIntensity);
-                //laseredValue = CalculateLaseredValue(gun.laserIntensity);
-                //console.cargoValue += (laseredValue * (1 + (console.laserDamage * 0.08f)));
-                float damage = Mathf.Clamp(gun.laserIntensity / 10, 25f, 95f);
-                health -= damage;
+                if (gun.Target == gameObject && laserTouching)
+                {
+                    AddOre(gun.laserIntensity);
+                    float damage = Mathf.Clamp(gun.laserIntensity / 10, 25f, 95f);
+                    health -= damage;
+                }
+                if(enemyLaserHitting)
+                {
+                    health -= 25f;
+                    iceAmount -= iceAmount*0.1f;
+                    hydrogenAmount -= hydrogenAmount*0.1f;
+                    clayAmount -= clayAmount*0.1f;
+                }
 
                 asteroidHealthToShare = Mathf.Round((health / maxHealth) * 100f);
                 timer1 = 0f;
             }
         }
-        else if (!laserTouching && health < maxHealth)
+        else if ((!laserTouching && !enemyLaserHitting) && health < maxHealth)
         {
             timer1 = 0f;
             if (asteroidMat.HasFloat("_BlendFactor"))
@@ -639,14 +725,22 @@ public class Mineable : MonoBehaviour
                 asteroidMat.SetFloat("_BlendFactor", totalBlend);
             }
         }
-        if (asteroidHealthToShare <= deathPercent && isDestroyed == false && gameObject == gun.Target)
+        if (asteroidHealthToShare <= deathPercent && isDestroyed == false && (gameObject == gun.Target || enemyLaserHitting)) //If our health reaches 0.
         {
             timer1 = 0f;
             isDestroyed = true;
-            gun.unLock();
-            cameraShake.shakeFactor = (100f / gun.Distance);
+            if (gun.Target == gameObject)
+            {
+                gun.Target = null;
+                gun.isMining = false;
+                gun.unLock();
+            }
+            cameraShake.shakeFactor = (100f / distance);
             StartCoroutine(cameraShake.SHAKE());
-            healthScript.health -= Mathf.Round((maxHealth / gun.Distance) * 3f);
+            if (distance < 300 && !gameObject.name.Contains("big"))
+            {
+                healthScript.health -= Mathf.Round((maxHealth / distance) * 3f);
+            }
             if (asteroidMat.HasFloat("_BlendFactor"))
             {
                 asteroidMat.SetFloat("_BlendFactor", 0f);
@@ -659,14 +753,19 @@ public class Mineable : MonoBehaviour
 
             foreach (Collider hit in colliders)
             {
+                float distance = Vector3.Distance(hit.transform.position, transform.position);
                 Rigidbody rb = hit.GetComponent<Rigidbody>();
+                EnemyHealth health = hit.GetComponent<EnemyHealth>();
                 if (rb != null)
                 {
                     rb.AddExplosionForce(maxHealth * 5f, transform.position, maxHealth);
                 }
+                if(health != null)
+                {
+                    health.health -= Mathf.Round((maxHealth / distance) * 5f);
+                }
             }
-            gun.Target = null;
-            gun.isMining = false;
+
             Destroy(gameObject, 1.1f);
         }
     }
