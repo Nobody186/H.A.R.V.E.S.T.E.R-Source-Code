@@ -26,11 +26,14 @@ public class dataPodManager : MonoBehaviour
     bool openedMonitor;
 
     GameObject originalWaypointToGive;
+    public Vector3 storedPos;
 
     private void Start()
     {
         originalWaypointToGive = new GameObject(waypointToGive.name);
         originalWaypointToGive.transform.position = waypointToGive.transform.position;
+
+        storedPos = waypointToGive.transform.position;
     }
 
     //private void OnTriggerEnter(Collider other)
@@ -55,6 +58,7 @@ public class dataPodManager : MonoBehaviour
             console.tutorialButton = TutorialPod;
             console.tutPodNum = tutPodNumb;
             console.waypointToAdd = originalWaypointToGive;
+            console.positionToSave = storedPos;
             openedMonitor = true;
         }
         if(openedMonitor && gun.Target != gameObject)
