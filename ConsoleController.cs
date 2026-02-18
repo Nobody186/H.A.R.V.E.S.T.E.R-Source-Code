@@ -20,9 +20,9 @@ public class ConsoleController : MonoBehaviour
     public List<GameObject> earnedWaypoints;
     [SerializeField] List<Transform> normalizedWaypoints;
     public GameObject waypointToAdd;
+    public Vector3 positionToSave;
     public int currentWaypoint;
     private float rangeToWaypoint;
-    bool gotDecoded = false;
 
     [SerializeField] Camera cam;
 
@@ -67,6 +67,7 @@ public class ConsoleController : MonoBehaviour
 
     [SerializeField] AudioSource oxygenWarning;
     [SerializeField] GameObject oxygenLight;
+    [SerializeField] SoundManager soundManager;
     bool warningOxygen = false;
 
     //Upgrade stuff
@@ -116,6 +117,7 @@ public class ConsoleController : MonoBehaviour
     [SerializeField] cameraShake shake;
     [SerializeField] GameObject warpConfirmation;
     [SerializeField] AudioSource warpConfirmSound;
+    public bool warpJammed = false;
     public bool canWarp = true;
     public bool isWarping = false;
     private float initialRange = 0f;
@@ -568,6 +570,7 @@ public class ConsoleController : MonoBehaviour
 
         if(lifeSupportDuration <= 1f && deathTime == false)
         {
+            soundManager.Request(0);
             deathTime = true;
             lifeSupportDuration = 60;
         }
@@ -653,20 +656,20 @@ public class ConsoleController : MonoBehaviour
             seatMat.SetFloat("_cloakFactor", camoLerper);
         }
 
-        if (Input.GetKeyDown(KeyCode.M) && canWarp == true)
-        {
-            navMode = !navMode;
-            if(Vector3.Distance(transform.position, waypoints[currentWaypoint].transform.position) > 15000) //If our current waypoint is not the waypoint we are at right now,
-            {
-                for(int i = 0; i < waypoints.Count; i++)
-                {
-                    if(Vector3.Distance(transform.position, waypoints[i].transform.position) < 15000)
-                    {
-                        currentWaypoint = i;
-                    }
-                }
-            }
-        }
+        //if (Input.GetKeyDown(KeyCode.M) && canWarp == true)
+        //{
+            //navMode = !navMode;
+            //if(Vector3.Distance(transform.position, waypoints[currentWaypoint].transform.position) > 15000) //If our current waypoint is not the waypoint we are at right now,
+           //{
+                //for(int i = 0; i < waypoints.Count; i++)
+                //{
+                    //if(Vector3.Distance(transform.position, waypoints[i].transform.position) < 15000)
+                    //{
+                        //currentWaypoint = i;
+                    //}
+                //}
+            //}
+        //}
 
         if (!navMode)
         {
@@ -724,7 +727,7 @@ public class ConsoleController : MonoBehaviour
                     float enemHealth = gunController.Target.GetComponent<EnemyHealth>().health;
                     if (enemHealth > 0)
                     {
-                        predictedHealth.text = "TARGET HULL: " + gunController.Target.GetComponent<EnemyHealth>().health;
+                        predictedHealth.text = "TARGET HULL: " + (gunController.Target.GetComponent<EnemyHealth>().health / gunController.Target.GetComponent<EnemyHealth>().maxHealth)*100f + "%";
                     }
                     else
                     {
@@ -907,7 +910,10 @@ public class ConsoleController : MonoBehaviour
 
                 waypointMarker.transform.position = cam.WorldToScreenPoint(screenPoint);
 
-                WayPointText.text = waypoints[currentWaypoint].name + "\n" + Mathf.Round(rangeToWaypoint) + "M";
+
+            if (rangeToWaypoint < 10000) WayPointText.text = waypoints[currentWaypoint].name + "\n" + Mathf.Round(rangeToWaypoint) + "M";
+            else WayPointText.text = waypoints[currentWaypoint].name + "\n999999M";
+
             if (!isWarping)
             {
                 screenText.text = (Mathf.Round(playerController.VehicleSpeed) + " KM/H");
@@ -937,7 +943,19 @@ public class ConsoleController : MonoBehaviour
             caps.Add("I've added some coordinates into you navigation system labeled 'THE FIRING RANGE'.");
             times.Add(6);
             caps.Add("Head over there as soon as you can. Please.");
-            StartCoroutine(storyManager.playNextStep(tutorialMessage2, false, "", true, "GO TO THE FIRING RANGE", KeyCode.None, false, caps, times, false));
+
+            StoryMessage message = new StoryMessage();
+            message.subtitles = caps;
+            message.timestamps = times;
+            message.audio = tutorialMessage2;
+            message.showControlText = false;
+            message.controlText = "";
+            message.bind = KeyCode.None;
+            message.customInstruction = false;
+            message.freezePlayer = false;
+
+            storyManager.EnqueueMessage(message);
+
             playedTutMessage2 = true;
             waypointToAdd = allWaypoints[2];
             AddPoint();
@@ -1046,7 +1064,7 @@ public class ConsoleController : MonoBehaviour
             normalizedWaypoints.Add(newWaypointObject.transform);
             earnedWaypoints.Add(waypointToAdd);
             waypoints.Add(waypointToAdd);
-            waypointsToSave.Add(waypointToAdd.transform.position);
+            waypointsToSave.Add(positionToSave);
         }
         else if(earnedWaypoints == null)
         {
@@ -1057,7 +1075,7 @@ public class ConsoleController : MonoBehaviour
             normalizedWaypoints.Add(newWaypointObject.transform);
             earnedWaypoints.Add(waypointToAdd);
             waypoints.Add(waypointToAdd);
-            waypointsToSave.Add(waypointToAdd.transform.position);
+            waypointsToSave.Add(positionToSave);
         }
         if(tutorialButton && tutPodNum == 1 && !alreadyPressed)
         {
@@ -1069,7 +1087,18 @@ public class ConsoleController : MonoBehaviour
             caps.Add("Open the navigation app, and then choose T-ZONE 1 as your selected waypoint.");
             times.Add(8);
             caps.Add("After that, initiate the warp.");
-            StartCoroutine(storyManager.playNextStep(tutorialMessage1, false, "[M]\nFOR NAVIGATION MODE", false, "WARP TO T-ZONE 1", KeyCode.None, false, caps, times, false));
+
+            StoryMessage message = new StoryMessage();
+            message.subtitles = caps;
+            message.timestamps = times;
+            message.audio = tutorialMessage1;
+            message.showControlText = false;
+            message.controlText = "";
+            message.bind = KeyCode.None;
+            message.customInstruction = false;
+            message.freezePlayer = false;
+
+            storyManager.EnqueueMessage(message);
         }
         monitor.downloadedData = true;
         alreadyPressed = true;
