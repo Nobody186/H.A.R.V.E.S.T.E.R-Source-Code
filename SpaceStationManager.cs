@@ -55,6 +55,8 @@ public class SpaceStationManager : MonoBehaviour
 
     public bool isInRange;
 
+    bool fastRepairing = false;
+
     private void Awake()
     {
         fees.Add("NON-ESSENTIAL LABOR GRATIFICATION TRIBUTE: ");
@@ -73,7 +75,7 @@ public class SpaceStationManager : MonoBehaviour
         fees.Add("LOCAL MARKET TAX: ");
         fees.Add("GALACTIC MARKET TAX: ");
         fees.Add("SECTION 514&3:2 FEES: ");
-        fees.Add("NOT LISTENING TO STATE-SPONSORED MEDIA FINE: ");
+        fees.Add("NOT LISTENING TO SUPPLEMENTARY SPONSORED MEDIA FINE: ");
         fees.Add("REGULAR MARKET TAX: ");
         fees.Add("AFTER MARKET TAX: ");
         fees.Add("COMMUNAL TOOTHBRUSH INFRASTRUCTURE PROJECT TAX: ");
@@ -90,12 +92,72 @@ public class SpaceStationManager : MonoBehaviour
         fees.Add("DESTRUCTION OF PROPERTY FINE: ");
         fees.Add("WEAPONRY FINANCE TRIBUTE: ");
         fees.Add("READING THE FEES FEE: ");
-        fees.Add("INTERGALACTIC TRANSPORTATION FEES: ");
-        fees.Add("IMPORTANT PERSONNEL LUXURY BUDGET BIG-INATOR CONTRIBUTION: ");
+        fees.Add("INTERGALACTIC RESOURCE TRANSPORTATION FEES: ");
+        fees.Add("CERTIFIED ASSOCIATE LUXURY-BUDGET STREAMLINING FUND: ");
         fees.Add("UNPAID OVERTIME INCENTIVE FEE: ");
         fees.Add("LOCAL SECTOR TAX: ");
         fees.Add("INTERGALATIC SECTOR TAX: ");
-        fees.Add("VOLUNTARY DONATION FOR DEFENSE PURPOSES: ");
+        fees.Add("VOLUNTARY SECURITY-RELATED DONATION: ");
+        fees.Add("NORMAL LAUNDRY PAYMENT: ");
+        fees.Add("MONEY LAUNDRY PAYMENT: ");
+        fees.Add("STANDARIZED CONTRACTOR HARMONIZATION FUND: ");
+        fees.Add("INTEGRATED U.F.M. CONTRIBUTION: ");
+        fees.Add("FREE RADIO SUBSCRIPTION PLAN: ");
+        fees.Add("H.A.R.V.E.S.T.E.R TRAINING RECONCILIATION LOANS: ");
+        fees.Add("DEPARTMENT OF UNIVERSAL COMMERCE COMPREHENSIVE LOANS: ");
+        fees.Add("CONTINUED CELLULAR PROCESSES FEE: ");
+        fees.Add("BATHROOM STALL RENT: ");
+        fees.Add("FAMILY RANSOM PAYMENT: ");
+        fees.Add("BEING A LOSER FINE: ");
+        fees.Add("SUSPECTED UNLOYAL SYNCHRONIZATION FINE: ");
+        fees.Add("BADTHINK FINE: ");
+        fees.Add("REFINERY SMOG-CIRCULATOR MAINTENANCE CHARGE: ");
+        fees.Add("POOR WORK ETHIC FINE: ");
+        fees.Add("PROVISIONAL BAD VIBES QUOTA EXCEEDED FINE: ");
+        fees.Add("CREDIT INTEREST DEDUCTION: ");
+        fees.Add("INTEREST INTEREST: ");
+        fees.Add("INTEREST INTEREST INTEREST");
+        fees.Add("STRATEGIC PARTNER DONATION CONTRIBUTION: ");
+        fees.Add("DENTAL INSURANCE PLAN CHARGE: ");
+        fees.Add("HONORARY ANTI-UNION CONTRIBUTION: ");
+        fees.Add("MINIMUM FROWNING QUOTA INCENTIVE TAX: ");
+        fees.Add("ICE LIQUIDIFIER MAINTENANCE CHARGE: ");
+        fees.Add("INTERGALACTIC PSEUDOSCIENCE FUND: ");
+        fees.Add("PROCESSOR MAINTENANCE CHARGE: ");
+        fees.Add("WORKPLACE DEATH COMPENSATION: ");
+        fees.Add("DAILY NUTRIENT BLOCK TAX: ");
+        fees.Add("BATHROOM STALL HOUSING TAX: ");
+        fees.Add("NONEXISTENT HOUSING DISINCENTIVE TAX: ");
+        fees.Add("LABOR CONTRACTING FEE: ");
+        fees.Add("INEFFICIENT SMILING FEE: ");
+        fees.Add("INSUFFICIENT MANDATORY COLLABORATIVE THRESHOLD UNMET PENALTY: ");
+        fees.Add("SECRET TAX: ");
+        fees.Add("PROJECT MEDICAL CENTER CESSATION TAX: ");
+        fees.Add("CORPORATE BOARD SALARY EXTERNALIZATION TAX: ");
+        fees.Add("COLONUS RETRIBUTION FEES: ");
+        fees.Add("PROVISIONAL PREVENTATIVE RECESSION MEASURES TAX: ");
+        fees.Add("NEUROCHIP SOFTWARE MAINTENANCE FEE: ");
+        fees.Add("MINOR-SURVEILLANCE MAINTENANCE CHARGE: ");
+        fees.Add("CONTROLLED GREENHOUSE FAMINE DISINCENTIVE PENALTY: ");
+        fees.Add("INEFFICIENT WALKING STEPS PENALTY: ");
+        fees.Add("MINIMUM QUOTA EXCEEDED FINE: ");
+        fees.Add("MAXIMUM QUOTA UNEXCEEDED FINE: ");
+        fees.Add("MENTAL ILLNESS DISINCENTIVE PENALTY: ");
+        fees.Add("LOW-TIER PERSONNEL DISINCENTIVE TAX: ");
+        fees.Add("LOW STANDARIZED INTELLIGENCE METRIC DISINCENTIVE TAX");
+        fees.Add("RECKLESS FLYING FINE: ");
+        fees.Add("DIRTY HANDS IN WORKPLACE FINE: ");
+        fees.Add("WORST ASSOCIATE OF THE YEAR AWARD: ");
+        fees.Add("NIGHT-SHIFT WORKTIME DEDUCTION: ");
+        fees.Add("WORKER'S FEE: ");
+        fees.Add("AUTOMATIC CAPITAL EXTRACTOR TERMINAL INTERFACE MAINTENANCE CHARGE: ");
+        fees.Add("UNSTOIC ATTITUDE FINE: ");
+        fees.Add("WORKING IN UNSAFE CONDITIONS FINE: ");
+        fees.Add("ENVIRONMENTAL COLLISION THRESHOLD EXCEEDED FINE: ");
+        fees.Add("BLAH BLAH BLAH BLAH: ");
+        fees.Add("89y906y97HT&*!TL: ");
+        fees.Add("COMMUNAL TOOTHBRUSH INFRASTRUCTURE CANCELLATION TAX: ");
+        fees.Add("SIGNING LOYALTY OATH REWARD: ");
 
         if (SceneManager.GetActiveScene().name == "Market")
         {
@@ -249,11 +311,11 @@ public class SpaceStationManager : MonoBehaviour
         repairChooser.minValue = 0;
         if (upgradeMultiplierToCost > 10)
         {
-            repairCost = repairChooser.value * upgradeMultiplierToCost;
+            repairCost = repairChooser.value * (upgradeMultiplierToCost/2f) * 400f;
         }
         else
         {
-            repairCost = repairChooser.value * 10f;
+            repairCost = repairChooser.value * 400f * (upgradeMultiplierToCost / 2f);
         }
         repairAmountCounter.text = "REPAIR AMOUNT: " +  repairChooser.value;
         repairBalanceCounter.text = "BALANCE: " + console.Balance;
@@ -295,21 +357,11 @@ public class SpaceStationManager : MonoBehaviour
         {
             calculating = true;
             //Determine how much money we want to steal from the player.
-            if (console.cargoValue > 1000000f)
-            {
-                predeterminedOweAmount = console.cargoValue * 0.95f;
-            }
-            else if(console.cargoValue < 110000f)
-            {
-                predeterminedOweAmount = console.cargoValue * 0.5f;
-            }
-            else
-            {
-                predeterminedOweAmount = console.cargoValue * 0.8f;
-            }
+            predeterminedOweAmount = console.cargoValue * 0.95f;
+
             while (predeterminedOweAmount > totalFeeCost) //Create a list of values to deduct from the player until we reach the value we agreed on
             {
-                tempFee = Random.Range(1000, 50000);
+                tempFee = Random.Range(1000, 5000);
                 feeCosts.Add(tempFee);
                 totalFeeCost += tempFee;
             }
@@ -454,11 +506,15 @@ public class SpaceStationManager : MonoBehaviour
 
     public void fastRepair()
     {
-        StartCoroutine(playRepairLine());
+        if (!fastRepairing)
+        {
+            StartCoroutine(playRepairLine());
+        }
     }
 
     IEnumerator playRepairLine()
     {
+        fastRepairing = true;
         if (healthScript.health == healthScript.maxHealth)
         {
             repairVoicelines[0].Play();
@@ -470,11 +526,12 @@ public class SpaceStationManager : MonoBehaviour
             yield return new WaitForSeconds(repairVoicelines[1].clip.length);
         }
 
-        console.Balance -= 5000;
+        console.Balance -= 50000;
         GameObject temp = Instantiate(moneyPopup, canvas);
         temp.SetActive(true);
         Destroy(temp, 1f);
         healthScript.health = healthScript.maxHealth;
+        fastRepairing = false;
     }
 
     public void buyFusionCell()
