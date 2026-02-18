@@ -89,7 +89,7 @@ public class EnemyMovement : MonoBehaviour
 
     private float defaultViewRange;
 
-    GameObject closestAsteroid; //Note: This is not used for obstacle avoidance. This is for miner ships.
+    public GameObject closestAsteroid; //Note: This is not used for obstacle avoidance. This is for miner ships.
     GameObject prevAsteroid;
 
     bool firingThrusters = false;
@@ -122,6 +122,11 @@ public class EnemyMovement : MonoBehaviour
     private static readonly int maxRaycastsPerFrame = 10; //Limited amount of raycasts for asteroid scanning
     private int currentRaycastIndex = 0;
     private List<Vector3> scanDirections;
+
+    //For the enemyMining Script
+    public Vector3 hitDirection;
+    public Transform hitPoint;
+    [SerializeField] LayerMask ignoreMask;
 
     void Awake()
     {
@@ -164,6 +169,7 @@ public class EnemyMovement : MonoBehaviour
         {
             scanDirections.Add(Random.onUnitSphere * asteroidScanDistance);
         }
+        rb.maxLinearVelocity = 240f;
     }
 
     void Update()
@@ -288,7 +294,7 @@ public class EnemyMovement : MonoBehaviour
         //We move.
         if (distance > stopDistance)
         {
-            rb.linearDamping = 1f - (Mathf.Clamp01(Vector3.Dot(transform.forward, vectorToTarget))) * 5f; //This should keep our linear damping at 1 when we're on target, and make it higher when we're not (so we can slow down and adjust)
+            rb.linearDamping = (1f - Mathf.Clamp01(Vector3.Dot(transform.forward, vectorToTarget))) * 1.2f; //This should keep our linear damping lower when we're on target, and make it higher when we're not (so we can slow down and adjust)
             if (chase)
             {
                 rb.AddRelativeForce(0f, 0f, chasePosSpeed * updateInterval);
@@ -298,7 +304,7 @@ public class EnemyMovement : MonoBehaviour
                 rb.AddRelativeForce(0f, 0f, posSpeed * updateInterval);
             }
 
-            if (isVisible && isDrone && !mainThruster.isPlaying)
+            if (isVisible && (isDrone || (!isDrone && !isDisc)) && !mainThruster.isPlaying)
             {
                 mainThruster.Play();
             }
@@ -334,7 +340,7 @@ public class EnemyMovement : MonoBehaviour
         //Stop movement when close
         if (distance < stopDistance)
         {
-            if (isDrone)
+            if ((isDrone || (!isDrone && !isDisc)))
             {
                 mainThruster.Stop();
             }
@@ -349,24 +355,19 @@ public class EnemyMovement : MonoBehaviour
         {
             if (hit.transform.name != "PlayerShip" && hit.transform.position != Target && !hit.transform.gameObject.GetComponent<Collider>().isTrigger)
             {
-                print(gameObject.name + " HAS DETECTED A " + hit.transform.name + "! AVOIDANCE SYSTEM ACTIVATED!");
                 avoiding = true;
 
                 if (Vector3.Distance(secondaryTarget, Vector3.zero) < 1f) //If haven't cached our current target yet, do so.
                 {
-                    print("SETTING SECONDARY TARGET TO TARGET!");
                     secondaryTarget = Target; //First thing we do is store the target we originally wanted to go to.
                 }
-                print(gameObject.name + " IS FETCHING AN AVOIDANCE ROUTE!");
                 findAvoidanceRoute();
             }
         }
         else
         {
-            print(gameObject.name + " REPORTS: MY VIEW IS CLEAR!");
             if (secondaryTarget != Vector3.zero) //If there's nothing ahead of us, but we're still avoiding (secondaryTarget is always Vector3.zero if not avoiding), then get back on task and turn off the avoiding state.
             {
-                print(gameObject.name + " HAS EXITED ITS AVOIDANCE MODE!");
                 Target = secondaryTarget;
                 secondaryTarget = Vector3.zero;
                 avoiding = false;
@@ -549,7 +550,7 @@ public class EnemyMovement : MonoBehaviour
             refPointer.SetActive(false);
         }
 
-        // When the player escapes...
+        //When the player escapes, disengage.
         if (Vector3.Distance(transform.position, Player.position) > viewRange)
         {
             firstFrameAttack = false;
@@ -645,6 +646,12 @@ public class EnemyMovement : MonoBehaviour
                     laserEmission.gameObject.transform.position = TurretSphere.transform.position;
                     TurretSphere.transform.LookAt(Target);
                     laserEmission.Play();
+                    RaycastHit hit;
+                    if (Physics.Raycast(TurretSphere.transform.position, TurretSphere.transform.forward, out hit, Mathf.Infinity, ~ignoreMask))
+                    {
+                        hitPoint.position = hit.point;
+                        hitDirection = hit.normal;
+                    }
                 }
                 else if (localPos.y < 0)
                 {
@@ -652,7 +659,14 @@ public class EnemyMovement : MonoBehaviour
                     laserEmission.gameObject.transform.position = TurretSphere2.transform.position;
                     TurretSphere2.transform.LookAt(Target);
                     laserEmission.Play();
+                    RaycastHit hit;
+                    if (Physics.Raycast(TurretSphere2.transform.position, TurretSphere2.transform.forward, out hit, Mathf.Infinity, ~ignoreMask))
+                    {
+                        hitPoint.position = hit.point;
+                        hitDirection = hit.normal;
+                    }
                 }
+
                 laserEmission.gameObject.transform.LookAt(Target);
                 ParticleSystem.MainModule temp = laserEmission.main;
                 temp.startLifetime = distance / 693.15f; //This magic number makes sure the laser only goes as far as the target is.
@@ -762,13 +776,14 @@ public class EnemyMovement : MonoBehaviour
     {
         attacking = true;
         console.beingAttacked = true;
-
         if (isDrone)
         {
             GameObject spawnedMissile = Instantiate(Missile, missileRack.position, Quaternion.identity);
+            yield return new WaitForEndOfFrame();
             spawnedMissile.SetActive(true);
             console.lightToFlash = RWRLight;
             console.warnToPlay = RWRSound;
+            yield return new WaitForEndOfFrame();
             StartCoroutine(console.flashLight());
         }
         else if (isDisc)
@@ -789,9 +804,11 @@ public class EnemyMovement : MonoBehaviour
             gunAnimator.SetTrigger("Firing");
             gunDeploySound.Stop();
             gunFireSound.Play();
+
             for (int i = 0; i < muzzleFlash.Count; i++)
             {
                 muzzleFlash[i].Play();
+            
             }
             while (gunDuration < gunFireTime)
             {
@@ -932,14 +949,12 @@ public class EnemyMovement : MonoBehaviour
             int num = Random.Range(0, 2);
             if (num == 1 && !exhausts[i].isEmitting)
             {
-                exhausts[i].Play();
-                print("FIRING THRUSTER " + exhausts[i].name);
+                exhausts[i].Play(); //Firing thruster
                 yield return new WaitForSeconds(0.005f);
             }
             else if (num == 0 && exhausts[i].isPlaying)
             {
-                print("STOPPING THRUSTER " + exhausts[i].name);
-                exhausts[i].Stop(true, ParticleSystemStopBehavior.StopEmitting);
+                exhausts[i].Stop(true, ParticleSystemStopBehavior.StopEmitting); //Stopping thruster
                 yield return new WaitForSeconds(0.005f);
             }
         }
