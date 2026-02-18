@@ -2,6 +2,8 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using TMPro;
 using System.Runtime.CompilerServices;
+using UnityEngine.Audio;
+using static UnityEngine.Rendering.DebugUI;
 
 public class Health : MonoBehaviour
 {
@@ -24,7 +26,11 @@ public class Health : MonoBehaviour
 
     private float randomNum;
 
-    [SerializeField] AudioListener listener;
+    [SerializeField] AudioMixer audioMixer;
+
+    [SerializeField] AudioSource deathSfx;
+    [SerializeField] AudioSource smokeSfx;
+    [SerializeField] AudioSource fireSfx;
 
     public float force = 0f;
 
@@ -71,60 +77,77 @@ public class Health : MonoBehaviour
         }
         else
         {
-            health -= Mathf.Round(Mathf.Pow(force, 2f) / 250000f);
+            health -= Mathf.Clamp(Mathf.Round(Mathf.Pow(force, 2f) / 120000f), 0f, 50f);
         }
     }
 
     // Update is called once per frame
     void Update()
     {
-        hull.text = "HULL: " + health;
+
+        if (health > 0) hull.text = "HULL: " + health;
+        else hull.text = "HAIL SHERGEO";
+
         if(health <= 0f)
         {
             if (!deathExplosion.isPlaying)
             {
                 deathExplosion.Play();
                 whitePanel.SetActive(true);
+                deathSfx.Play();
             }
+
             Timer += Time.deltaTime;
-            
+
+            audioMixer.SetFloat("Music", Mathf.Log10(1-Timer)*20f);
+            audioMixer.SetFloat("Dialog", Mathf.Log10(1 - Timer) * 20f);
+            audioMixer.SetFloat("Effects", Mathf.Log10(1 - Timer) * 20f);
+
             if (Timer >= 2f)
             {
                 if (rogueMode)
                 {
-                    if (consoleController.highestDay >= consoleController.day)
+                    if (consoleController.highestDay <= consoleController.day)
                     {
                         consoleController.highestDay = consoleController.day;
                     }
+
                     consoleController.Balance = 0;
                     consoleController.cargoValue = 0;
                     consoleController.day = 0;
-                    consoleController.navUpgrade = false;
-                    consoleController.palUpgrade = false;
-                    consoleController.missileUpgrade = false;
+
                     consoleController.mainThrustLvl = 0;
                     consoleController.sideThrustLvl = 0;
                     consoleController.laserDmgLvl = 0;
                     consoleController.maxPlayerHealth = 100;
                     consoleController.playerHealth = 100;
                     consoleController.maxHealthLvl = 0;
+
                     consoleController.missileDamageLvl = 0;
                     consoleController.missileRearmLvl = 0;
                     consoleController.missileThrustLvl = 0;
                     consoleController.missileTimeLvl = 0;
                     consoleController.missileTurnLvl = 0;
+
                     consoleController.earnedWaypoints.Clear();
+
                     consoleController.usingCamoUpgrade = false;
                     consoleController.usingdampDisablerUpgrade = false;
                     consoleController.usingDashUpgrade = false;
                     consoleController.usingMissileUpgrade = false;
                     consoleController.usingPalUpgrade = false;
                     consoleController.usingRadar3Upgrade = false;
+
+                    consoleController.navUpgrade = false;
+                    consoleController.palUpgrade = false;
+                    consoleController.missileUpgrade = false;
                     consoleController.dampDisabler = false;
                     consoleController.dashUpgrade = false;
                     consoleController.camoUpgrade = false;
                     consoleController.radar3Upgrade = false;
+
                     consoleController.fusionCells = 10;
+
                     consoleController.ironHeld = 0;
                     consoleController.helium3Held = 0;
                     consoleController.aluminumHeld = 0;
@@ -138,6 +161,7 @@ public class Health : MonoBehaviour
                     consoleController.nickelHeld = 0;
                     consoleController.platiniumHeld = 0;
                     consoleController.plutoniumHeld = 0;
+
                     SaveData.SaveInfo(consoleController);
                     SceneManager.LoadScene("Menu");
                 }
@@ -158,6 +182,7 @@ public class Health : MonoBehaviour
         if(health <= 50f && !smoke.isPlaying)
         {
             smoke.Play();
+            smokeSfx.Play();
         }
 
         if(health > 10f && fire2.isPlaying)
@@ -170,6 +195,7 @@ public class Health : MonoBehaviour
         }
         if(health > 50 && smoke.isPlaying)
         {
+            smokeSfx.Stop();
             smoke.Stop();
         }
     }
