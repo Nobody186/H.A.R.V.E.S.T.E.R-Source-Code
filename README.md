@@ -15,3 +15,6 @@ Scripts Fundamental to Gameplay:
 
 H.A.R.V.E.S.T.E.R can be downloaded here as an early access game:
 https://bottleneck-studios.itch.io/harvester
+
+STEAM PAGE:
+https://store.steampowered.com/app/4453340/HARVESTER/
