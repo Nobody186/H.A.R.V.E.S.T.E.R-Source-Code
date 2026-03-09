@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System;
 
 public class monitorManager : MonoBehaviour
 {
@@ -26,6 +27,7 @@ public class monitorManager : MonoBehaviour
     [SerializeField] TextMeshProUGUI waypointLabel;
     [SerializeField] TextMeshProUGUI fusionCellCounter;
     bool awaitingConfirmation = false;
+    bool showingWarpError = false;
     [SerializeField] TextMeshProUGUI warpButtonText;
     [SerializeField] GameObject errorPanel;
     [SerializeField] GameObject jammerPanel;
@@ -52,6 +54,13 @@ public class monitorManager : MonoBehaviour
     public bool downloadedData = false;
 
     bool transitioning = false;
+
+    [SerializeField] AudioSource warpConfirm;
+    [SerializeField] AudioSource warpError;
+    [SerializeField] AudioSource scanSfx;
+
+    public event Action<string> onAppLoad;
+    public event Action<int> onWarp;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -159,6 +168,7 @@ public class monitorManager : MonoBehaviour
     {
         if (!loadingApp && app != appLoaded)
         {
+            onAppLoad?.Invoke(app.name);
             appToLoad = app;
             StartCoroutine(loadApp());
         }
@@ -199,11 +209,16 @@ public class monitorManager : MonoBehaviour
     {
         if (awaitingConfirmation && !console.isWarping && console.fusionCells >= 1 && console.canWarp)
         {
+            onWarp?.Invoke(console.currentWaypoint);
             StartCoroutine(console.Warp());
         }
         else if (!awaitingConfirmation && !console.isWarping && console.fusionCells >= 1 && console.canWarp && Vector3.Distance(console.waypoints[console.currentWaypoint].transform.position, transform.position) > 10000f)
         {
             StartCoroutine(WarpConfirmation());
+        }
+        else if(Vector3.Distance(console.waypoints[console.currentWaypoint].transform.position, transform.position) < 10000f && !showingWarpError)
+        {
+            StartCoroutine(warpErrorPlay());
         }
     }
 
@@ -247,8 +262,22 @@ public class monitorManager : MonoBehaviour
 
         fusionCellCounter.text = "FUSION CELLS LEFT: " + console.fusionCells;
     }
+
+    IEnumerator warpErrorPlay()
+    {
+        showingWarpError = true;
+        warpError.Play();
+        warpButtonText.fontSize = 0.04f;
+        warpButtonText.text = "ALREADY HERE!";
+        yield return new WaitForSeconds(1);
+        warpButtonText.fontSize = 0.05f;
+        warpButtonText.text = "WARP";
+        showingWarpError = false;
+    }
+
     IEnumerator WarpConfirmation()
     {
+        warpConfirm.Play();
         awaitingConfirmation = true;
         warpButtonText.text = "CONFIRM WARP?";
         warpButtonText.fontSize = 0.04f;
@@ -260,19 +289,25 @@ public class monitorManager : MonoBehaviour
 
     public void rightWaypoint()
     {
-        console.currentWaypoint += 1;
-        if (console.currentWaypoint >= console.waypoints.Count)
+        if (!awaitingConfirmation)
         {
-            console.currentWaypoint = 0;
+            console.currentWaypoint += 1;
+            if (console.currentWaypoint >= console.waypoints.Count)
+            {
+                console.currentWaypoint = 0;
+            }
         }
     }
 
     public void leftWaypoint()
     {
-        console.currentWaypoint -= 1;
-        if (console.currentWaypoint < 0)
+        if (!awaitingConfirmation)
         {
-            console.currentWaypoint = console.waypoints.Count - 1;
+            console.currentWaypoint -= 1;
+            if (console.currentWaypoint < 0)
+            {
+                console.currentWaypoint = console.waypoints.Count - 1;
+            }
         }
     }
 
@@ -287,8 +322,16 @@ public class monitorManager : MonoBehaviour
         }
         else if (gun.Target != null && waitForScanPanel.activeSelf)
         {
-            waitForScanText.text = "READY TO SCAN";
-            scanButton.SetActive(true);
+            if (gun.Target.name.Contains("Asteroid"))
+            {
+                waitForScanText.text = "READY TO SCAN";
+                scanButton.SetActive(true);
+            }
+            else
+            {
+                waitForScanText.text = "TARGET CANNOT BE SCANNED";
+                scanButton.SetActive(false);
+            }
         }
         else
         {
@@ -299,6 +342,7 @@ public class monitorManager : MonoBehaviour
     public void Scan()
     {
         waitForScanPanel.SetActive(false);
+        scanSfx.Play();
         scanAnimator.Play("scanPopUp", -1, 0f);
     }
 
