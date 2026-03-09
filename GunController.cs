@@ -4,8 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
-using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
+using System.Net;
 
 public class GunController : MonoBehaviour
 {
@@ -34,7 +33,6 @@ public class GunController : MonoBehaviour
     //update from the future: This was 100% worth it.
     [SerializeField] GameObject lockHud;
     [SerializeField] GameObject lockParticle;
-    [SerializeField] GameObject decoyHud;
     [SerializeField] Transform spawn;
     [SerializeField] Transform particleSpawn;
     //This is just so we can physically point the gun. The player can't see it but I already programmed it in and it took some effort getting it pointed right
@@ -108,12 +106,25 @@ public class GunController : MonoBehaviour
 
     // Staggered update variables
     private int currentUpdateIndex = 0;
-    private float staggeredUpdateTimer = 0f;
-    private const float staggeredUpdateInterval = 0.05f; // Update every 0.05 seconds
     private int updatesPerFrame = 2; // Number of items to update per staggered update
+
+    //Events
+    public static event Action OnLock;
+    public static event Action OnUnlock;
+    public static event Action<float> onContact;
+    public static event Action<Vector3> onLockAttempt;
+
+    //Material block
+    MaterialPropertyBlock mpb;
+    //Thing I should cache.
+    Renderer targetRenderer;
+
+    public bool palMode = false;
+    public bool searching = true;
 
     private void Start()
     {
+        mpb = new MaterialPropertyBlock();
         LaserParticle.Stop();
         debrisCloud.Stop();
         laserExplosion.SetActive(false);
@@ -188,6 +199,7 @@ public class GunController : MonoBehaviour
                 return;
             }
             //Register position with its velocity.
+            onContact?.Invoke(Vector3.Distance(transform.position, rdr.transform.position));
             recentScanPosition = Instantiate(BASIC.gameObject, rdr.transform.position, Quaternion.identity);
             recentScanPosition.GetComponent<Rigidbody>().linearVelocity = rdr.GetComponent<Rigidbody>().linearVelocity;
             positions.Add(recentScanPosition);
@@ -219,15 +231,22 @@ public class GunController : MonoBehaviour
     {
         if (lockAttempted && rdr != null && rdr.gameObject.layer != LayerMask.NameToLayer("basic")) //If we hit an object after pointing our radar at an area (to lock it)
         {
-            Target = rdr.gameObject;
-            RDRVisualizer.SetBool("Searching", false);
-            RDRVisualizer.SetBool("PAL", false);
-            RDRVisualizer.SetBool("LockAttempted", false);
-            RDRVisualizer.SetBool("LockSuccessful", true);
-            decoyHud.SetActive(true);
-            decoyHud.transform.position = cam.WorldToScreenPoint(Target.transform.position);
+            if (console.usingPalUpgrade && (!rdr.gameObject.name.Contains("small") && !rdr.gameObject.name.Contains("Radio")))
+            {
+                OnLock?.Invoke();
+                Target = rdr.gameObject;
+                searching = false;
+                palMode = false;
+            }
+            else if (!console.usingPalUpgrade)
+            {
+                OnLock?.Invoke();
+                Target = rdr.gameObject;
+                searching = false;
+                palMode = false;
+            }
             //print("TARGET: " + Target.name);
-            if (Target.name.Contains("Asteroid") && Target.GetComponent<Mineable>() == null)
+            if (Target != null && Target.name.Contains("Asteroid") && Target.GetComponent<Mineable>() == null)
             {
                 Mineable targetRef = Target.AddComponent<Mineable>();
                 targetRef.gun = this;
@@ -251,9 +270,12 @@ public class GunController : MonoBehaviour
                     targetRef.explosion = smallExplosion;
                 }
             }
-            lockAttempted = false;
-            palAttempted = false;
-            radarLockSfx.Play();
+            if (Target != null)
+            {
+                lockAttempted = false;
+                palAttempted = false;
+                radarLockSfx.Play();
+            }
             return;
         }
     }
@@ -272,18 +294,19 @@ public class GunController : MonoBehaviour
             if (!palAttempted)
             {
                 timer = 0;
+                Debug.Log("UNLOCKED BECAUSE PAL MODE WAS TOGGLED OFF BY USER");
                 unLock();
-                RDRVisualizer.SetBool("PAL", true);
-                RDRVisualizer.SetBool("Searching", false);
                 palAttempted = true;
-                lockAttempted = true;
+                searching = false;
+                palMode = true;
+                StartCoroutine(EnableLockNextFrame());
             }
             else if (palAttempted && Target == null)
             {
                 palAttempted = false;
                 lockAttempted = false;
-                RDRVisualizer.SetBool("PAL", false);
-                RDRVisualizer.SetBool("Searching", true);
+                searching = true;
+                palMode = false;
             }
         }
         if (!Input.GetKey(KeyCode.Mouse1))
@@ -356,7 +379,6 @@ public class GunController : MonoBehaviour
             LaserParticle.transform.LookAt(Target.transform);
             //print("LOCK SUCCESSFUL!");
             Distance = Vector3.Distance(gun.position, Target.transform.position);
-            decoyHud.SetActive(false);
 
             if (positions.Count > 0)
             {
@@ -417,6 +439,7 @@ public class GunController : MonoBehaviour
                             {
                                 LOS_Timer = 0f;
                                 unLock();
+                                Debug.Log("UNLOCKED BECAUSE VIEW HAD BEEN BLOCKED");
                             }
                         }
                         else
@@ -505,60 +528,52 @@ public class GunController : MonoBehaviour
             hudParticles[i].transform.rotation = particleLookDir;
         }
 
-        // Staggered update for color and visibility
-        staggeredUpdateTimer += Time.deltaTime;
-        if (staggeredUpdateTimer >= staggeredUpdateInterval)
+        for (int updateCount = 0; updateCount < updatesPerFrame && hudTrackers.Count > 0; updateCount++) //Cycle the elements we're watching and changing per frame.
         {
-            staggeredUpdateTimer = 0f;
-
-            for (int updateCount = 0; updateCount < updatesPerFrame && hudTrackers.Count > 0; updateCount++)
+            if (currentUpdateIndex >= hudTrackers.Count)
             {
-                if (currentUpdateIndex >= hudTrackers.Count)
-                {
-                    currentUpdateIndex = 0;
-                }
-
-                int i = currentUpdateIndex;
-
-                //Color handling
-                Button button = hudTrackers[i].GetComponent<Button>();
-                ColorBlock colors = button.colors;
-                Color buttonColor;
-
-                if (button.gameObject.GetComponent<buttonHiLiteCheck>().isMouseOver)
-                {
-                    buttonColor = colors.highlightedColor;
-                }
-                else
-                {
-                    buttonColor = colors.normalColor;
-                }
-
-                MaterialPropertyBlock mpb = new MaterialPropertyBlock();
-                mpb.SetColor("_EmissiveColor", buttonColor);
-                hudParticles[i].GetComponent<ParticleSystemRenderer>().SetPropertyBlock(mpb);
-
-                //if it is reasonable to show a lock symbol, then show it
-                if (positions[i].GetComponent<Renderer>().isVisible == true && Vector3.Distance(positions[i].gameObject.transform.position, transform.position) <= MaxRange)
-                {
-                    hudTrackers[i].SetActive(true);
-                    hudParticles[i].SetActive(true);
-                }
-                else
-                {
-                    hudTrackers[i].SetActive(false);
-                    hudParticles[i].SetActive(false);
-                }
-
-                currentUpdateIndex++;
+                currentUpdateIndex = 0;
             }
+
+            int i = currentUpdateIndex;
+
+            //Color handling
+            Button button = hudTrackers[i].GetComponent<Button>();
+            ColorBlock colors = button.colors;
+            Color buttonColor;
+
+            if (button.gameObject.GetComponent<buttonHiLiteCheck>().isMouseOver)
+            {
+                buttonColor = colors.highlightedColor;
+            }
+            else
+            {
+                buttonColor = colors.normalColor;
+            }
+
+            mpb.SetColor("_EmissiveColor", buttonColor);
+            hudParticles[i].GetComponent<ParticleSystemRenderer>().SetPropertyBlock(mpb);
+
+            //if it is reasonable to show a lock symbol, then show it
+            if (positions[i].GetComponent<Renderer>().isVisible == true && Vector3.Distance(positions[i].gameObject.transform.position, transform.position) <= MaxRange)
+            {
+                hudTrackers[i].SetActive(true);
+                hudParticles[i].SetActive(true);
+            }
+            else
+            {
+                hudTrackers[i].SetActive(false);
+                hudParticles[i].SetActive(false);
+            }
+
+            currentUpdateIndex++;
         }
     }
 
     public void Lock(Button clickedButton)
     {
         timer = 0;
-        Vector3 mousePos = clickedButton.transform.position;
+        Vector3 mousePos = cam.ScreenToWorldPoint(clickedButton.transform.position);
 
         for (int i = 0; i < positions.Count; i++)
         {
@@ -568,26 +583,25 @@ public class GunController : MonoBehaviour
             }
         }
 
-        RDRVisualizer.SetBool("PAL", false);
-        RDRVisualizer.SetBool("Searching", false);
-        RDRVisualizer.SetBool("LockAttempted", true);
-        Radar.transform.LookAt(cam.ScreenToWorldPoint(mousePos), Vector3.up);
-        decoyHud.transform.position = mousePos;
+        onLockAttempt?.Invoke(mousePos);
+
+        searching = false;
+        palMode = false;
         lockAttempted = true;
         //print("LOCK ATTEMPTED");
     }
 
     public void unLock()
     {
-        if (!isMining || (isMining && chargingLaser))
+        if (true) //!isMining || (isMining && chargingLaser))
         {
+            OnUnlock?.Invoke();
             Target = null;
-            RDRVisualizer.SetBool("LockSuccessful", false);
-            RDRVisualizer.SetBool("PAL", false);
-            RDRVisualizer.SetBool("LockAttempted", false);
-            RDRVisualizer.SetBool("Searching", true);
+            searching = true;
+            palMode = false;
             Radar.transform.LookAt(radarLook);
             lockAttempted = false;
+            palAttempted = false;
             lockHud.SetActive(false);
             lockParticle.SetActive(false);
             radarUnlockSfx.Play();
@@ -628,21 +642,35 @@ public class GunController : MonoBehaviour
         }
     }
 
-    public void setRadarLockSystems()
+    public void setRadarLockSystems() //We run this every frame to run the basic "radar locked" behavior.
     {
-        for (int i = 0; i < positions.Count; i++)
+        if (positions.Count > 0)
         {
-            Destroy(positions[i].gameObject);
-            Destroy(hudTrackers[i].gameObject);
-            Destroy(hudParticles[i].gameObject);
-            positions.Remove(positions[i]);
-            hudTrackers.Remove(hudTrackers[i]);
-            hudParticles.Remove(hudParticles[i]);
+            for (int i = 0; i < positions.Count; i++)
+            {
+                Destroy(positions[i].gameObject);
+                Destroy(hudTrackers[i].gameObject);
+                Destroy(hudParticles[i].gameObject);
+                positions.Remove(positions[i]);
+                hudTrackers.Remove(hudTrackers[i]);
+                hudParticles.Remove(hudParticles[i]);
+            }
         }
-
         Radar.transform.LookAt(Target.transform.position);
-        lockHud.SetActive(true);
-        lockParticle.SetActive(true);
+        if (Target.GetComponent<Renderer>() != null)
+        {
+            targetRenderer = Target.GetComponent<Renderer>();
+        }
+        if (targetRenderer.isVisible == false)
+        {
+            lockHud.SetActive(false);
+            lockParticle.SetActive(false);
+        }
+        else
+        {
+            lockHud.SetActive(true);
+            lockParticle.SetActive(true);
+        }
 
         // Update lock HUD position and rotation every frame (continuous)
         Vector3 screenPos = cam.WorldToScreenPoint(Target.transform.position);
@@ -657,27 +685,22 @@ public class GunController : MonoBehaviour
         Quaternion particleLookDir = Quaternion.LookRotation(Target.transform.position - cam.transform.position).normalized;
         lockParticle.transform.rotation = particleLookDir;
 
-        // Color handling (staggered update)
-        staggeredUpdateTimer += Time.deltaTime;
-        if (staggeredUpdateTimer >= staggeredUpdateInterval)
+        //Color handling
+        Button button = lockHud.GetComponent<Button>();
+        ColorBlock colors = button.colors;
+        Color buttonColor;
+
+        if (button.gameObject.GetComponent<buttonHiLiteCheck>().isMouseOver)
         {
-            Button button = lockHud.GetComponent<Button>();
-            ColorBlock colors = button.colors;
-            Color buttonColor;
-
-            if (button.gameObject.GetComponent<buttonHiLiteCheck>().isMouseOver)
-            {
-                buttonColor = colors.highlightedColor;
-            }
-            else
-            {
-                buttonColor = colors.normalColor;
-            }
-
-            MaterialPropertyBlock mpb = new MaterialPropertyBlock();
-            mpb.SetColor("_EmissiveColor", buttonColor);
-            lockParticle.GetComponent<ParticleSystemRenderer>().SetPropertyBlock(mpb);
+            buttonColor = colors.highlightedColor;
         }
+        else
+        {
+            buttonColor = colors.normalColor;
+        }
+
+        mpb.SetColor("_EmissiveColor", buttonColor);
+        lockParticle.GetComponent<ParticleSystemRenderer>().SetPropertyBlock(mpb);
 
         if (!Target.gameObject.name.Contains("Enemy"))
         {
@@ -691,6 +714,7 @@ public class GunController : MonoBehaviour
                 chargingLaser = false;
                 Cool = false; //Turn on our cooldown
                 laserOnTimer = 0f;
+                Debug.Log("UNLOCKED BECAUSE RANGE");
                 unLock();
             }
 
@@ -706,12 +730,17 @@ public class GunController : MonoBehaviour
             }
             if (!hasTarget)
             {
-                //print("COULDNT FIND TARGET!");
-                isMining = false; //stop mining
-                chargingLaser = false;
-                Cool = false; //Turn on our cooldown
-                laserOnTimer = 0f;
-                unLock();
+                LOS_Timer += Time.deltaTime;
+                if (LOS_Timer >= 1f) //1 second is our grace period.
+                {
+                    LOS_Timer = 0f;
+                    isMining = false; //stop mining
+                    chargingLaser = false;
+                    Cool = false; //Turn on our cooldown
+                    laserOnTimer = 0f;
+                    Debug.Log("UNLOCKED BECAUSE OUR VIEW HAS BEEN BLOCKED.");
+                    unLock();
+                }
             }
         }
     }
@@ -724,8 +753,8 @@ public class GunController : MonoBehaviour
             if (Target == null && lockAttempted == true && timer > 1f)
             {
                 //print("LOCK FAILURE!");
-                RDRVisualizer.SetBool("LockAttempted", false);
-                RDRVisualizer.SetBool("Searching", true);
+                searching = true;
+                palMode = false;
                 lockAttempted = false;
                 canMine = false;
                 timer = 0f;
@@ -755,5 +784,18 @@ public class GunController : MonoBehaviour
         {
             PopUp.SetActive(false);
         }
+    }
+
+    IEnumerator EnableLockNextFrame()
+    {
+        yield return new WaitForFixedUpdate(); //Wait for physics to catch up.
+        lockAttempted = true;
+    }
+
+    public IEnumerator textPopUpThing() //Something that enemies can use right before they die so they dont end up running a coroutine they cant finish.
+    {
+        oreCollectedText.gameObject.SetActive(true);
+        yield return new WaitForSeconds(0.9f);
+        oreCollectedText.gameObject.SetActive(false);
     }
 }
