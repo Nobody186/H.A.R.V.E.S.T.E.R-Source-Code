@@ -1,8 +1,5 @@
-using NUnit.Framework;
 using UnityEngine;
 using System.Collections.Generic;
-using Unity.VisualScripting;
-using System.Collections;
 using System.Linq;
 
 public class redactorTurret : MonoBehaviour
@@ -35,6 +32,9 @@ public class redactorTurret : MonoBehaviour
     [SerializeField] cameraShake shaker;
     private Transform player;
 
+    [SerializeField] Transform normal;
+    [SerializeField] bool upsideDown = false;
+
     void Start()
     { 
         staggeredUpdateInterval = Random.Range(0.1f, 0.9f);
@@ -52,29 +52,37 @@ public class redactorTurret : MonoBehaviour
             timer = 0f;
             SearchForTarget();
         }
-        if(fireRateTimer >= fireRate && target != null)
+
+        if (target != null && Vector3.Dot(normal.forward, (target.position - normal.position).normalized) <= 0.4f)
+        {
+            target = null;
+        }
+
+        if (fireRateTimer >= fireRate && target != null)
         {
             Attack();
         }
 
         if (target != null)
         {
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(target.position - transform.position, transform.up), Time.deltaTime*rotationSpeed);
+            if(!upsideDown) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(target.position - transform.position, transform.up), Time.deltaTime*rotationSpeed);
+            else transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(-(target.position - transform.position), transform.up), Time.deltaTime * rotationSpeed);
         }
+        if (!upsideDown) normal.localRotation = Quaternion.Euler(0f, 0f, 0f);
+        else normal.localRotation = Quaternion.Euler(0f, 180f, 0f);
     }
 
     void SearchForTarget()
     {
         if (target == null || Vector3.Distance(target.position, aimThing.position) > engageDistance)
         {
-            transform.localRotation = Quaternion.Euler(0, 0, 0);
             target = null;
             distance = engageDistance;
             List<GameObject> potentialTargets = new List<GameObject>();
-            Collider[] PotentialColliders = Physics.OverlapSphere(aimThing.position, engageDistance, ~ignoreLayer);
+            Collider[] PotentialColliders = Physics.OverlapSphere(normal.position, engageDistance, ~ignoreLayer);
             for(int i = 0; i < PotentialColliders.Count(); i++)
             {
-                if(Vector3.Dot(aimThing.forward, (PotentialColliders[i].transform.position - aimThing.position).normalized) > 0.3f && !PotentialColliders[i].transform.gameObject.name.Contains("small"))
+                if(Vector3.Dot(normal.forward, (PotentialColliders[i].transform.position - normal.position).normalized) > 0.4f && !PotentialColliders[i].transform.gameObject.name.Contains("small") && !PotentialColliders[i].isTrigger && !PotentialColliders[i].transform.gameObject.name.Contains("BASIC"))
                 {
                     potentialTargets.Add(PotentialColliders[i].transform.gameObject);
                 }
@@ -83,6 +91,7 @@ public class redactorTurret : MonoBehaviour
             {
                 if(Vector3.Distance(aimThing.position, potentialTargets[i].transform.position) <= distance && potentialTargets[i].GetComponent<Rigidbody>() != null)
                 {
+                    distance = (Vector3.Distance(aimThing.position, potentialTargets[i].transform.position));
                     target = potentialTargets[i].transform;
                 }
             }
@@ -99,7 +108,6 @@ public class redactorTurret : MonoBehaviour
 
         if (Physics.SphereCast(aimThing.position, 1.5f, aimThing.forward, out hit, Mathf.Infinity, ~ignoreLayer))
         {
-            print(hit.transform.gameObject.name);
             float distance = Vector3.Distance(hit.transform.position, player.position);
             if(distance <= 500f)
             {
@@ -142,14 +150,12 @@ public class redactorTurret : MonoBehaviour
                         GameObject explosion = Instantiate(bigExplosion, hit.transform.position, Quaternion.identity);
                         explosion.SetActive(true);
                         Destroy(hit.transform.gameObject);
-                        transform.localRotation = Quaternion.Euler(0, 0, 0);
                     }
                     else
                     {
                         GameObject explosion = Instantiate(smallExplosion, hit.transform.position, Quaternion.identity);
                         explosion.SetActive(true);
                         Destroy(hit.transform.gameObject);
-                        transform.localRotation = Quaternion.Euler(0, 0, 0);
                     }
                 }
             }
