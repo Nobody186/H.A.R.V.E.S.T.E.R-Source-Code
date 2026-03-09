@@ -46,6 +46,7 @@ public class StoryManager : MonoBehaviour
     [SerializeField] List<AudioSource> pirateChatters;
     [SerializeField] List<AudioSource> pirateAmbush;
 
+    bool needToInterrupt = false;
 
     [SerializeField] List<AudioSource> tutorialMessages;
 
@@ -88,6 +89,8 @@ public class StoryManager : MonoBehaviour
 
     float staggeredUpdateTimer = 0f;
     float staggeredUpdateInterval = .5f;
+
+    public static bool isPlaying = false;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
 
@@ -287,11 +290,23 @@ public class StoryManager : MonoBehaviour
     //A generic function to play an audio source, and show some text on the player's screen.
     public void EnqueueMessage(StoryMessage message)
     {
-        storyQueue.Enqueue(message);
-
-        if(!playingStoryMessage)
+        if (!message.interrupt)
         {
-            StartCoroutine(queueProcessor());
+            storyQueue.Enqueue(message);
+            if (!playingStoryMessage)
+            {
+                StartCoroutine(queueProcessor());
+            }
+        }
+        else
+        {
+            storyQueue.Clear();
+            storyQueue.Enqueue(message);
+            needToInterrupt = true;
+            if (!playingStoryMessage)
+            {
+                StartCoroutine(queueProcessor());
+            }
         }
     }
 
@@ -310,6 +325,7 @@ public class StoryManager : MonoBehaviour
 
     public IEnumerator playNextStep(StoryMessage msg) //Timestamps should be like : 4.2 seconds
     {
+        isPlaying = true;
         captions.gameObject.SetActive(true);
         float timer = 0f;
         float whiteoutTimer = 0f;
@@ -320,6 +336,7 @@ public class StoryManager : MonoBehaviour
         float soundLength = msg.audio.clip.length;
         bool finishedMessage = false;
         bool didWhiteout = false;
+
         radioLight.SetActive(true);
         captions.text = msg.subtitles[0];
         if(msg.redactorSpawn)
@@ -329,9 +346,22 @@ public class StoryManager : MonoBehaviour
         }
         while (!finishedMessage) //While we're playing our message, keep the captions updated.
         {
+            if (needToInterrupt)
+            {
+                finishedMessage = true;
+                isPlaying = false;
+                msg.audio.Pause();
+                if (console.canWarp)
+                {
+                    player.canMove = true;
+                }
+                captions.gameObject.SetActive(false);
+                needToInterrupt = false;
+                yield break;
+            }
             if (console.canWarp)
             {
-                player.canMove = !msg.freezePlayer;
+                player.canMove = !msg.freezePlayer; //If we're not currently warping, freeze the player if the message asks us to.
             }
             captions.text = msg.subtitles[index];
             timer += Time.deltaTime;
@@ -391,6 +421,7 @@ public class StoryManager : MonoBehaviour
         }
         radioLight.SetActive(false);
         captions.gameObject.SetActive(false);
+        isPlaying = false;
     }
 
     void checkQuotaProgression()
@@ -542,6 +573,8 @@ public class StoryMessage
     public string controlText;
     public KeyCode bind;
     public bool freezePlayer;
+
+    public bool interrupt = false;
 
     public bool whiteOut = false;
     public float timeToWhiteOut = 0f;
