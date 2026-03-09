@@ -51,7 +51,7 @@ public class SenseOfFlight : MonoBehaviour
     {
         if (!isMenu)
         {
-            cam.fieldOfView = (baseFOV + (playerController.VehicleSpeed * Time.deltaTime * zoomSpeed));
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, (baseFOV + (playerController.VehicleSpeed * Time.deltaTime * zoomSpeed)), Time.deltaTime * zoomSpeed);
 
 
             if (Input.GetMouseButton(1))
