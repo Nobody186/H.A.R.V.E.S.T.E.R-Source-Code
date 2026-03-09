@@ -1,9 +1,8 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using TMPro;
-using System.Runtime.CompilerServices;
+using System;
 using UnityEngine.Audio;
-using static UnityEngine.Rendering.DebugUI;
 
 public class Health : MonoBehaviour
 {
@@ -36,6 +35,8 @@ public class Health : MonoBehaviour
 
     private float Timer = 0f;
 
+    public static event Action<float> onDamage;
+
     private void Start()
     {
         fire1.Stop();
@@ -48,7 +49,7 @@ public class Health : MonoBehaviour
     private void OnCollisionEnter(Collision collision)
     {
         force = collision.impulse.magnitude / Time.fixedDeltaTime;
-        randomNum = Random.Range(1, 6);
+        randomNum = UnityEngine.Random.Range(1, 6);
         switch (randomNum)
         {
             case 1:
@@ -70,14 +71,15 @@ public class Health : MonoBehaviour
                 break;
         }
 
-        print("FORCE: " + force);
         if (collision.gameObject.name.Contains("Debris"))
         {
             health -= Mathf.Round(Mathf.Pow(force, 2f)/120000f);
         }
         else
         {
-            health -= Mathf.Clamp(Mathf.Round(Mathf.Pow(force, 2f) / 120000f), 0f, 50f);
+            float damage = Mathf.Clamp(Mathf.Round(Mathf.Pow(force, 2f) / 150000f), 0f, 33f);
+            health -= damage;
+            onDamage?.Invoke(damage);
         }
     }
 
