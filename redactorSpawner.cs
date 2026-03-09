@@ -8,15 +8,21 @@ public class redactorSpawner : MonoBehaviour
     [SerializeField] AudioSource arrivalTrack;
     [SerializeField] GameObject navigationApp;
     [SerializeField] GameObject whiteout;
+    [SerializeField] List<GameObject> otherRedactorSpawners;
     public List<int> daysCanSpawn = new List<int>();
     public float spawnChance = 0.001f;
     private float timer = 0f;
     private float timeCheckIntervals = 30f;
 
     bool tryingToSpawn = false;
+    bool hasRedactor = false;
+
+    [SerializeField] Transform player;
+    float distance = 0f;
 
     [Tooltip("This is for developer purposes only. Check this to override a spawn for the redactor")]
     public bool spawn = false;
+    bool alreadySpawned = false;
 
     private void Start()
     {
@@ -29,6 +35,13 @@ public class redactorSpawner : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        distance = Vector3.Distance(player.position, transform.position);
+
+        if(transform.childCount > 0 && Vector3.Distance(transform.position, player.position) > 15000)
+        {
+            transform.Find("Redactor(Clone)").gameObject.SetActive(false);
+        }
+
         if(navigationApp.activeSelf)
         {
             return; //Don't risk a spawn if the player is in the warp menu. Can break immersion or a terrible edge case might occur.
@@ -37,7 +50,7 @@ public class redactorSpawner : MonoBehaviour
         if(timer >= timeCheckIntervals)
         {
             timer = 0f;
-            if(Random.value <= spawnChance)
+            if(Random.value <= spawnChance && !alreadySpawned)
             {
                 Spawn();
             }
@@ -57,6 +70,11 @@ public class redactorSpawner : MonoBehaviour
 
     void Spawn()
     {
+        for(int i = 0; i < otherRedactorSpawners.Count; i++)
+        {
+            otherRedactorSpawners[i].SetActive(false);
+        }
+
         List<string> caps = new List<string>();
         List<float> times = new List<float>();
         caps.Add("");
